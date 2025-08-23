@@ -4,10 +4,36 @@
         <meta charst="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Musiq Studio</title>
-        <link rel="stylesheet" href="style.css"
+
+        <!-- Pi SDK-->
+         <script src="https://sdk.minepi.com/pi-sdk.js"></script>
     </head>
     <body>
         <h1>&#127925; Welcome to Musiq Studio</h1>
-        <p>This is your placeholder app for Pi Network intergration.</p>
+        <!-- Login Section-->
+         <button onclick="login()"></button>Login with Pi</button>
+        <p id="user-info"></p>
+
+        <script>
+            // Initialize Pi SDK
+            Pi.init({ version: "2.0"});
+            async function login() {
+                try {
+                    const scopes = ['username', 'payment']; // ask for username +wallet
+                    const user = await Pi.authenticate(scopes, onIncompletePaymentFound);
+
+                    // Display username after login
+                    document.getElementById("user-info").innerText =
+                    "Welcome, " + user.name + "&#127926;";
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+
+            //Handle incomple payments (required by Pi)
+            function onIncompletePaymentFound(payment) {
+                console.log("Incomplete payment found:", payment);
+            }
+        </script>
     </body>
 </html>
