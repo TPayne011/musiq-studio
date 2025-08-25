@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charst="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Musiq Studio</title>
 
         <!-- Pi SDK-->
@@ -12,19 +12,19 @@
         <h1>&#127925; Welcome to Musiq Studio</h1>
         <!-- Login Section-->
          <button onclick="login()">Login with Pi</button>
-        <p id=user-info"></p>
+        <p id="user-info"></p>
 
         <script>
             // Initialize Pi SDK
             Pi.init({ version: "2.0"});
             async function login() {
                 try {
-                    const scopes = ['username', 'payment']; // ask for username +wallet
+                    const scopes = ['username']; // request username
                     const user = await Pi.authenticate(scopes, onIncompletePaymentFound);
 
                     // Display username after login
                     document.getElementById("user-info").innerText =
-                    "Welcome, " + user.name + "&#127926;";
+                    "Welcome, " + username + "&#127926;";
                 } catch (err) {
                     console.error(err);
                 }
