@@ -1,19 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
-</head>      
+<head>      
   <meta charset="UTF-8">
+  <title>Musiq Studio on Pi</title>
+  <!--Load Pi SDK-->
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 
-        <title>Musiq Studio on Pi</title>
-        <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-</head>
-</body>
-   <h1>Login with Pi Network</h1>
+  <!--Button styling-->
+  <style>
+    body {
+        font-family: arial, sans-serif;
+        text-align: center;
+        padding-top: 100px;
+        background-color: f9f9f9;
+    }
+    button {
+        padding: 12px 24px;
+        font-size: 18px;
+        border-radius: 6px;
+        background-color: #6a0dad;
+        color: white;
+        border: none;
+        cursor: pointer;
+    }
+    button:hover {
+        background-color: #520a9c;
+      }
+    </style>
+    </head>
+
+    <body>
+      <h1>Login with Pi Network</h1>
+      <!--The login button-->
    <button onclick="loginWithPi()">Login with Pi</button>
 
    <script>
-    // Wait until the SDK has loaded
+    // Run after page load
     window.addEventListener("load", ()=> {
+        
         if (window.Pi) {
+            //Initialize SDK
             Pi.init({version: 2.0}),
             console.log("Pi SDK initilized");
         } else {
@@ -21,7 +47,9 @@
         }
     });
 
-            async function loginWithPi() {
+    //login function
+
+        async function loginWithPi() {
             try{
                 const scopes= ['username','payments'];
                 const authResult=await pi.authenticate(scopes);
