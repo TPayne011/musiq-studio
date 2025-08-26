@@ -2,38 +2,40 @@
 <html lang="en">
 </head>      
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
         <title>Musiq Studio on Pi</title>
         <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-        <script>
-            // Initialize SDK (this must be at the top, only once!)
-            Pi.init({version: "2.0"});
+</head>
+</body>
+   <h1>Login with Pi Network</h1>
+   <button onclick="loginWithPi()">Login with Pi</button>
 
-            // Function for login
+   <script>
+    // Wait until the SDK has loaded
+    window.addEventListener("load", ()=> {
+        if (window.Pi) {
+            Pi.init({version: 2.0}),
+            console.log("Pi SDK initilized");
+        } else {
+            console.error("X Pi SDK not loaded");
+        }
+    });
+
             async function loginWithPi() {
             try{
                 const scopes= ['username','payments'];
                 const authResult=await pi.authenticate(scopes);
-
-                //successful login
                 console.log('User authenticated:', authResult);
                 alert('Welcome,' + authResult.user.username);
-
-                //send authResult to your backend for verification
-                //Example: fetch('verify',{method: 'Post',body: JSON.stringify(authResult)})
-
             } catch (error){
                 console.error('Pi login failed:',error);
                 alert('Login failed:'+ error.message);
             }
         }
         </script>
-        </head>
-        </body>
-        <h1>Login with Pi Network</h1>
-        <button onclick="loginWithPi()"></button>
         </body>
         </html>
+    
 
 
 
