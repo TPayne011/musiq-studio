@@ -8,9 +8,14 @@
     <body>
         <h1>&#127925; Welcome to Musiq Studio on Pi</h1>
         <!-- Login Section-->
-         Pi.init({version: "2.0"});
+         
      <button onclick="loginWithPi()"> Login with Pi</button>
      <script>
+        function loginWithPi() {
+            // Initialize SDK
+            Pi.init({version: 2.0});
+        }
+
         const pi=window.Pi;
 
         async function loginWithPi() {
