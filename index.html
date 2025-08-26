@@ -1,35 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Musiq Studio</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Musiq Studio on Pi</title>
 
         <!-- Pi SDK-->
          <script src="https://sdk.minepi.com/pi-sdk.js"></script>
     </head>
     <body>
-        <h1>&#127925; Welcome to Musiq Studio</h1>
+        <h1>&#127925; Welcome to Musiq Studio on Pi</h1>
         <!-- Login Section-->
-         <button onclick="login()">Login with Pi</button>
-        <p id="user-info"></p>
+     <button onclick="loginWithPi()"> Login with Pi</button>
 
         <script>
-            // Initialize Pi SDK
-            Pi.init({ version: "2.0"});
-            async function login() {
-                try {
-                    const scopes = ['username']; // request username
-                    const user = await Pi.authenticate(scopes, onIncompletePaymentFound);
+            function loginWithPi() {
+                // initialize SDK 
+                  Pi.init({ version: "2.0"});
 
-                    // Display username after login
-                    document.getElementById("user-info").innerText =
-                    "Welcome, " + username + "&#127926;";
-                } catch (err) {
-                    console.error("Login error:", err);
-                }
+                  //ask for users name as a basic scope
+                  Pi.authenticate(
+                    ['username'],
+                    function onIncomplete() {
+                        console.log("Auth incomplete");
+                    },
+                    function onSuccess(authResult) {
+                        console.log("Auth success:", authResult);
+                        alert("Welcome, " + authResult.user.username);
+                    },
+                    function onCancel() {
+                        console.log("Auth cancelled");
+                    }
+                );
             }
-
+                    
+                
+            
+                  
             //Handle incomple payments (required by Pi)
             function onIncompletePaymentFound(payment) {
                 console.log("Incomplete payment found:", payment);
