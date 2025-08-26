@@ -1,39 +1,42 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="en"><head        
+  <meta charset="UTF-8">
         <title>Musiq Studio on Pi</title>
-
-        <!-- Pi SDK-->
-         <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+        <script src="https://sdk.minepi.com/pi-sdk.js"></script>
     </head>
     <body>
         <h1>&#127925; Welcome to Musiq Studio on Pi</h1>
         <!-- Login Section-->
      <button onclick="loginWithPi()"> Login with Pi</button>
+     <script>
+        const pi=window.Pi;
 
-        <script>
-            function loginWithPi() {
-                // initialize SDK 
-                  Pi.init({ version: "2.0"});
+        async function loginWithPi() {
+            try{
+                const scopes= ['username','payments'];
+                const authResult=await pi.authenticate(scopes);
 
-                  //ask for users name as a basic scope
-                  Pi.authenticate(
-                    ['username'],
-                    function onIncomplete() {
-                        console.log("Auth incomplete");
-                    },
-                    function onSuccess(authResult) {
-                        console.log("Auth success:", authResult);
-                        alert("Welcome, " + authResult.user.username);
-                    },
-                    function onCancel() {
-                        console.log("Auth cancelled");
-                    }
-                );
+                //successful login
+                console.log('User authenticated:', authResult);
+                alert('Welcome,' + authResult.user.username);
+
+                //send authResult to your backend for verification
+                //Example: fetch('verify',{method: 'Post',body: JSON.stringify(authResult)})
+
+            } catch (error){
+                console.error('Pi login failed:',error);
+                alert('Login failed:'+ error.message);
             }
-                    
+        }
+        </script>
+        </body>
+        </html>
+
+
+
+        
+
+                 
                 
             
                   
