@@ -1,24 +1,16 @@
 <!DOCTYPE html>
-<html lang="en"><head        
+<html lang="en">
+</head>      
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Musiq Studio on Pi</title>
         <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-    </head>
-    <body>
-        <h1>&#127925; Welcome to Musiq Studio on Pi</h1>
-        <!-- Login Section-->
-         
-     <button onclick="loginWithPi()"> Login with Pi</button>
-     <script>
-        function loginWithPi() {
-            // Initialize SDK
-            Pi.init({version: 2.0});
-        }
+        <script>
+            // Initialize SDK (this must be at the top, only once!)
+            Pi.init({version: "2.0"});
 
-        const pi=window.Pi;
-
-        async function loginWithPi() {
+            // Function for login
+            async function loginWithPi() {
             try{
                 const scopes= ['username','payments'];
                 const authResult=await pi.authenticate(scopes);
@@ -36,6 +28,10 @@
             }
         }
         </script>
+        </head>
+        </body>
+        <h1>Login with Pi Network</h1>
+        <button onclick="loginWithPi()"></button>
         </body>
         </html>
 
