@@ -5,38 +5,65 @@
   <title>Musiq Studio on Pi</title>
   <!--Load Pi SDK-->
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-  </head>
-  <body>
-    <h1>Login with Pi Network</h1>
+  
+  <!--Button styling-->
+  <style>
+    body { 
+        font-family: Arial, sans-serif;
+        text-align: center;
+        padding-top: 100px;
+        background-color: #f9f9f9;
+    }
+    button {
+       padding: 12px 24px;
+       font-size: 18px;
+       border-radius: 6px;
+       background-color: #6a0dad;
+       color: white;
+       border: none;
+       cursor: pointer;
+    }
+    button:hover {
+
+        background-color:#520a9c;
+    }
+    </style>
+</head>
+
+<body>
+   <h1>Login with Pi Network</h1>
     <button onclick="loginWithPi()">Login with Pi</button>
 
    <script>
-    window.onload=function () {
-        
-        if (window.Pi) {
+    // Run after page load
+    window.addEventListener("load", () => {
+      console.log("Checking if Pi SDK loaded:", window.Pi);
+      
+      if (window.Pi) {
             //Initialize SDK
-            Pi.init({version: 2.0}),
+            Pi.init({version: "2.0"}),
             console.log("Pi SDK initilized");
+      } else {
+        console.error("X Pi SDK not loaded-must run inside Pi Browser");
+      }
+    });
 
-            document.getElementById("pi-login").onclick = async function () {
-              try {
-                const scopes= ['username','payments'];
-                const authResult=await pi.authenticate(scopes);
-                console.log('User authenticated:', authResult);
-                alert('Welcome,' + authResult.user.username);
-            } catch (error){
-                console.error('Pi login failed:',error);
-                alert('Login failed:'+ error.message);
-            }
-         }; else {
-            console.error("Pi SDK not loaded!");
-            alert("Pi SDK not loaded. Please check Pi Browser.");
-          }
-        };
-
-        </script>
-        </body>
-        </html>
+    // Login function
+    async function loginWithPi() {
+     try {
+        const scopes= ['username','payments'];
+        const authResult = await pi.authenticate(scopes);
+                
+        console.log('User authenticated:', authResult);
+        alert('Welcome,' + authResult.user.username);
+   }    catch (error) {
+        console.error('Pi login failed:',error);
+        alert('Login failed:'+ error.message);
+   }
+ }
+ </script>
+ </body>
+ </html>
     
 
 
