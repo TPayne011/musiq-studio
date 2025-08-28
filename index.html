@@ -33,32 +33,36 @@
     </style>
  </head>
  <body>
-   <h1>Welcome to Musiq Studio &#127826;</h1>
+   <h1>Welcome to Musiq Studio &#127926;</h1>
     <button id="pi-login" onclick="loginWithPi()">Login with Pi</button>
+    <p id="welcome message"></p>
 
    <script>
-    // Ensure SDK is ready before using it
-    window.onload = function () {
+    // Initialize SDK after page load
+    window.addEventListener("load", () => {
       if (window.Pi) {
-            //Initialize SDK
-            Pi.init({ version: "2.0" }),
-            console.log("&#9989; Pi SDK initilized");
-      } else {
-        console.error("&#10060; Pi SDK not loaded-must run inside Pi Browser");
+        Pi.init({ version: "2.0", sandbox: true }); // key sandbox mode on
+        console.log("&#9989; Pi SDK initilize (sandbox mode)");
+      }else { 
+        console.error("&#10060; Pi SDK not loaded - must run inside Pi Browser");
       }
-    };
-
-    // Login handler
+    });
+    
+    // Login function
     async function loginWithPi() {
      try {
-        const scopes= ['username','payments'];
-        const authResult = await pi.authenticate(scopes);
-                
-        console.log("User authenticated:", authResult);
-        alert('Welcome, $(authResult.user.username)!');
-   }    catch (error) {
-        console.error("Pi login failed:",error);
-         alert ("Login failed: " + error.message);
+      if (!window.pi) {
+        alert("Pi SDK not loaded yet.");
+        return;
+      }
+      const scopes= ['username'];
+      const authResult = await pi.authenticate(scopes);
+      console.log("&#127881; User authenticated:", authResult);
+      document.getElementById("welcome-message").textContent =
+        'Welcome, ${authResult.username} &#127926;';
+   }    catch (err) {
+        console.error("&#10060; Pi login failed:",err);
+         alert ("Login failed: " + (err?.message || err));
    }
  }
  </script>
