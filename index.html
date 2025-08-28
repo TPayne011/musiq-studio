@@ -41,7 +41,7 @@
     window.onload = function () {
       if (window.Pi) {
             //Initialize SDK
-            Pi.init({version: "2.0"}),
+            Pi.init({ version: "2.0" }),
             console.log("&#9989; Pi SDK initilized");
       } else {
         console.error("&#10060; Pi SDK not loaded-must run inside Pi Browser");
@@ -58,7 +58,7 @@
         alert('Welcome, $(authResult.user.username)!');
    }    catch (error) {
         console.error("Pi login failed:",error);
-        alert('Login failed:'+ error.message);
+         alert ("Login failed: " + error.message);
    }
  }
  </script>
