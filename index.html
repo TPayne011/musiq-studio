@@ -40,6 +40,7 @@
    <script>
     // Initialize SDK after page load
     window.addEventListener("load", () => {
+      console.log("window.pi is:", window.pi);
       if (window.Pi) {
         Pi.init({ version: "2.0", sandbox: true }); // key sandbox mode on
         console.log("&#9989; Pi SDK initilize (sandbox mode)");
