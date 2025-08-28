@@ -3,10 +3,10 @@
 <head>      
   <meta charset="UTF-8">
   <title>Musiq Studio on Pi</title>
-  <!--Load Pi SDK-->
+  <!-- Pi SDK -->
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
   
-  <!--Button styling-->
+  <!--Page + Button Styling-->
   <style>
     body { 
         font-family: Arial, sans-serif;
@@ -14,50 +14,50 @@
         padding-top: 100px;
         background-color: #f9f9f9;
     }
+    h1 {color: #333
+    }
     button {
-       padding: 12px 24px;
-       font-size: 18px;
-       border-radius: 6px;
-       background-color: #6a0dad;
+       padding: 15px 30px;
+       font-size: 20px;
+       border-radius: 8px;
+       background-color: #6A1B9A;
        color: white;
        border: none;
        cursor: pointer;
+       transition: background-color 0.3s ease
     }
     button:hover {
 
         background-color:#520a9c;
     }
     </style>
-</head>
-
-<body>
-   <h1>Login with Pi Network</h1>
-    <button onclick="loginWithPi()">Login with Pi</button>
+ </head>
+ <body>
+   <h1>Welcome to Musiq Studio &#127826;</h1>
+    <button id="pi-login" onclick="loginWithPi()">Login with Pi</button>
 
    <script>
-    // Run after page load
-    window.addEventListener("load", () => {
-      console.log("Checking if Pi SDK loaded:", window.Pi);
-      
+    // Ensure SDK is ready before using it
+    window.onload = function () {
       if (window.Pi) {
             //Initialize SDK
             Pi.init({version: "2.0"}),
-            console.log("Pi SDK initilized");
+            console.log("&#9989; Pi SDK initilized");
       } else {
-        console.error("X Pi SDK not loaded-must run inside Pi Browser");
+        console.error("&#10060; Pi SDK not loaded-must run inside Pi Browser");
       }
-    });
+    };
 
-    // Login function
+    // Login handler
     async function loginWithPi() {
      try {
         const scopes= ['username','payments'];
         const authResult = await pi.authenticate(scopes);
                 
-        console.log('User authenticated:', authResult);
-        alert('Welcome,' + authResult.user.username);
+        console.log("User authenticated:", authResult);
+        alert('Welcome, $(authResult.user.username)!');
    }    catch (error) {
-        console.error('Pi login failed:',error);
+        console.error("Pi login failed:",error);
         alert('Login failed:'+ error.message);
    }
  }
