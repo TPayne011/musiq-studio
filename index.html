@@ -53,6 +53,26 @@
       width: min(900px, 95vw);
     }
     #status { color: var(--muted); margin: 8px 0 0; }
+
+/* 🔔 Audio Studio timer styles */
+
+#rec-panel {
+  display: inline-block;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #f3f3ff;
+  color: #333;
+  font-weight: 600;
+}
+#rec-status.rec {
+  color: #0a6b42;      /* green while recording */
+}
+#rec-status.stop {
+  color: #7a0012;      /* red-ish when stopped */
+}
+#rec-timer { letter-spacing: 1px; }
+
+
     #welcome-message { font-weight: bold; margin: 0; }
     #preview-audio { width: 100%; margin-top: 12px; display: none; }
     .pill {
@@ -94,6 +114,14 @@
       <button class="btn" id="btn-market" disabled>Market</button>
       <button class="btn" id="btn-pi-total" disabled>Pi Total: 0 &pi;</button>
     </div>
+    <!-- Audio Studio: live recording timer -->
+<div id="audio-studio" style="margin-top:12px;">
+  <h3 style="margin:0 0 6px;">Audio Studio</h3>
+  <div id="rec-panel">
+    <span id="rec-status">Idle</span> — <span id="rec-timer">00:00</span>
+  </div>
+</div>
+
 
     <audio id="preview-audio" controls></audio>
     <p class="tiny">Tip: Actions enable after login.</p>
