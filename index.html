@@ -138,308 +138,190 @@
 
   <!-- Special Characters quick ref -->
 
+  <!-- BEGIN APP SCRIPT -->
+<script>
+/* ---------- tiny helpers ---------- */
+const $ = (id) => document.getElementById(id);
+function setStatus(msg){ const s = $("status"); if (s) s.innerHTML = msg; }
+function log(msg){ try{ console.log(msg); }catch(_){} }
 
-  <!-- App logic -->
-  <script>
-    // ---------- State ----------
-    let currentUser = null;
-    let mediaStream = null;
-    let mediaRecorder = null;
-    let recording = false;
-    let recordedChunks = [];
-// --- Audio Studio timer state ---
-let recInterval = null;   // setInterval handle
-let recStartMs = 0;       // when the current recording started
-let elapsedMs = 0;        // last measured duration (kept when stopped)
+/* ---------- global state ---------- */
+let currentUser = null;
 
-function setRecStatus(txt, cls = "") {
-  const s = document.getElementById("rec-status");
-  if (!s) return;
-  s.textContent = txt;
-  s.className = cls ? cls : "";
+/* ---------- enable/disable studio actions ---------- */
+function enableActions(enabled){
+  [
+    "btn-load",
+    "btn-record",
+    "btn-start-recording",
+    "btn-stop-recording",
+    "btn-mint",
+    "btn-market",
+    "btn-pi-total",
+    "btn-clear-minted" // ok if you don't have it; ignored
+  ].forEach(id=>{
+    const el = $(id);
+    if (el) el.disabled = !enabled;
+  });
 }
 
-function setRecTime(ms) {
-  const t = document.getElementById("rec-timer");
-  if (!t) return;
-  const totalSec = Math.floor(ms / 1000);
-  const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
-  const ss = String(totalSec % 60).padStart(2, "0");
-  t.textContent = `${mm}:${ss}`;
-}
-
-function startTimer() {
-  // fresh start
-  elapsedMs = 0;
-  recStartMs = Date.now();
-  setRecStatus("Recording… 🎤", "rec");
-  setRecTime(0);
-
-  recInterval = setInterval(() => {
-    const now = Date.now();
-    const ms = now - recStartMs;
-    setRecTime(ms);
-  }, 250);
-}
-
-function stopTimer() {
-  if (recInterval) {
-    clearInterval(recInterval);
-    recInterval = null;
-  }
-  // freeze display at final elapsed
-  elapsedMs = Date.now() - recStartMs;
-  setRecStatus("Stopped ⏹️", "stop");
-}
-
-
-    // Local "Pi Total" placeholder (until real payments)
-    const PiTotal = {
-      key: 'musiq-pi-total',
-      get() { return Number(localStorage.getItem(this.key) || '0'); },
-      set(v) { localStorage.setItem(this.key, String(v)); updatePiTotalUI(); }
-    };
-
-    // Lightweight activity log (localStorage)
-    const Activity = {
-      key: 'musiq-activity-log',
-      log: JSON.parse(localStorage.getItem('musiq-activity-log') || '[]'),
-      add(event, data = {}) {
-        const entry = {
-          ts: new Date().toISOString(),
-          event,
-          user: currentUser?.username || null,
-          ...data
-        };
-        this.log.push(entry);
-        localStorage.setItem(this.key, JSON.stringify(this.log));
-        console.log('📒 Activity:', entry);
-      },
-      dump() { return this.log; },
-      clear() { this.log = []; localStorage.removeItem(this.key); }
-    };
-
-    // ---------- Init SDK after load ----------
-    window.addEventListener("load", () => {
-      if (window.Pi) {
-        try {
-          Pi.init({ version: "2.0", sandbox: true }); // sandbox ON while building
-          log("&#9989; Pi SDK initialized (sandbox)");
-          setPill("SDK: Ready", true);
-        } catch (e) {
-          log("&#10060; Pi.init failed: " + (e?.message || e));
-          setPill("SDK: Init Error", false);
-        }
-      } else {
-        log("&#10060; Pi SDK not loaded — open in Pi Browser");
-        setPill("SDK: Not Loaded", false);
-      }
-
-      // Wire handlers (enable after login)
-      byId("btn-load").onclick = onLoadTrack;
-
-      // Toggle (Record <-> Stop)
-      byId("btn-record").onclick = onToggleRecord;
-
-      // Two-button pair (optional)
-      byId("btn-start-recording").onclick = startRecording;
-      byId("btn-stop-recording").onclick  = stopRecording;
-
-      byId("btn-mint").onclick   = onMintNft;
-      byId("btn-market").onclick = onMarket;
-      byId("btn-pi-total").onclick = showPiTotal;
-
-      updatePiTotalUI();
-    });
-
-    async function loginWithPi() {
-  if (!window.Pi) {
-    alert("Pi SDK not ready. Open in Pi Browser.");
-    return;
-  }
+/* ---------- Pi SDK init (sandbox) ---------- */
+function initPiSdk(){
+  if (!window.Pi){ setStatus("❌ SDK: Not Loaded"); return; }
   try {
-    // ✅ Now ask for both username + payments
-    const scopes = ['username', 'payments'];
+    Pi.init({ version: "2.0", sandbox: true });
+    setStatus("✅ Pi SDK initialized (sandbox)");
+  } catch (e) {
+    console.error(e);
+    setStatus("❌ Pi.init failed");
+  }
+}
+
+/* ---------- login (requests username + payments) ---------- */
+async function loginWithPi(){
+  if (!window.Pi){ alert("Pi SDK not ready. Open in Pi Browser."); return; }
+  try {
+    const scopes = ['username','payments']; // <-- IMPORTANT
     const auth = await Pi.authenticate(scopes);
 
-    // Show success in your UI
-    const user = auth?.user?.username || 'Pioneer';
-    document.getElementById("status").textContent = `✅ Logged in as ${user}`;
-    console.log("Auth success:", auth);
-
-    // (Re-enable buttons or other UI here if you disabled them before login)
-
+    currentUser = auth?.user || null;
+    const username = currentUser?.username || "Pioneer";
+    setStatus(`✅ Logged in as ${username} 🎉`);
+    enableActions(true);
+    log("Auth success: " + username);
   } catch (e) {
     console.error("Auth error:", e);
     alert("Login failed: " + (e?.message || e));
   }
 }
 
-
-    function enableActions(enabled) {
-      [
-        "btn-load",
-        "btn-record",
-        "btn-start-recording",
-        "btn-stop-recording",
-        "btn-mint",
-        "btn-market",
-        "btn-pi-total"
-      ].forEach(id => {
-        const el = byId(id);
-        if (el) el.disabled = !enabled;
-      });
+/* ---------- guard to ensure we have payments scope ---------- */
+async function ensurePaymentsScope(){
+  // Some SDKs expose granted scopes on the auth result; to be safe, reprompt if createPayment rejects.
+  try {
+    // quick no-op call to see if API exists
+    if (!Pi.createPayment) throw new Error("Payments API not available");
+    return true;
+  } catch {
+    try {
+      await Pi.authenticate(['payments']);
+      return true;
+    } catch (e) {
+      alert("Mint requires the 'payments' permission in Pi Browser.");
+      return false;
     }
-
-    // ---------- Load track (file picker + preview) ----------
-    function onLoadTrack() {
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = "audio/*";
-      input.onchange = () => {
-        const file = input.files?.[0];
-        if (!file) return;
-        const url = URL.createObjectURL(file);
-        const audio = byId("preview-audio");
-        audio.src = url;
-        audio.style.display = "block";
-        audio.play().catch(()=>{});
-        log(`📂 Loaded: ${file.name}`);
-        Activity.add('load_track', { name: file.name, size: file.size });
-      };
-      input.click();
-    }
-
-    // ---------- Record: one-button toggle ----------
-    async function onToggleRecord() {
-      if (!recording) {
-        await startRecording();
-        byId("btn-record").innerHTML = "Stop &#9724;&#65039;"; // ⏹️
-      } else {
-        await stopRecording();
-        byId("btn-record").innerHTML = "Record &#127908;"; // 🎤
-      }
-    }
-
-    // ---------- Record: explicit start/stop (optional pair) ----------
-    async function startRecording() {
-      try {
-        if (recording) return;
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaStream = stream;
-        recordedChunks = [];
-        mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-        mediaRecorder.ondataavailable = e => { if (e.data.size) recordedChunks.push(e.data); };
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(recordedChunks, { type: "audio/webm" });
-          const url = URL.createObjectURL(blob);
-          const audio = byId("preview-audio");
-          audio.src = url;
-          audio.style.display = "block";
-          log("⏹️ Recording stopped; preview ready.");
-          Activity.add('record_stop', { bytes: blob.size });
-        };
-        mediaRecorder.start();
-        recording = true;
-    // 🔔 START the Audio Studio 
-    startTimer();
-
-        log("🎤 Recording…");
-        Activity.add('record_start');
-      } catch (e) {
-        console.error(e);
-        alert("Mic permission failed. Check browser settings.");
-        log("&#10060; Mic error");
-        Activity.add('record_error', { error: String(e?.message || e) });
-      }
-    }
-
-    async function stopRecording() {
-      if (!recording) return;
-      mediaRecorder?.stop();
-      mediaStream?.getTracks()?.forEach(t => t.stop());
-      recording = false;
-
-     // 🔔 STOP the Audio Studio 
-     stopTimer();
-
   }
+}
 
-    // ---------- Mint NFT: sandbox payment flow ----------
-    async function onMintNft() {
-      try {
-        if (!window.Pi) return alert("Pi SDK not ready. Use Pi Browser.");
-        Activity.add('mint_click');
-        await Pi.createPayment({
-          amount: 1, // 1 π (sandbox)
-          memo: "Mint NFT &#127926;", // 🎶
-          metadata: { type: "mint", item: "nft_demo_1" }
-        }, {
-          onReadyForServerApproval: (paymentId) => {
-            log("📝 Ready for server approval: " + paymentId);
-            Activity.add('payment_ready_for_approval', { paymentId });
-            // TODO: send paymentId to your backend for approval
-          },
-          onReadyForServerCompletion: (paymentId, txId) => {
-            log("&#9989; Payment completed! ID: " + paymentId + ", tx: " + txId);
-            Activity.add('payment_completed', { paymentId, txId });
-            PiTotal.set(PiTotal.get() + 1); // Local placeholder counter
-          },
-          onCancel: (paymentId) => {
-            log("&#10060; Payment cancelled: " + paymentId);
-            Activity.add('payment_cancelled', { paymentId });
-          },
-          onError: (error, paymentId) => {
-            log("⚠️ Payment error: " + error + " (ID: " + paymentId + ")");
-            Activity.add('payment_error', { paymentId, error: String(error) });
-          }
-        });
-      } catch (err) {
-        console.error("Payment failed:", err);
-        alert("Mint failed: " + (err?.message || err));
-        log("&#10060; Mint failed: " + (err?.message || err));
-        Activity.add('mint_failed', { error: String(err?.message || err) });
+/* ---------- Mint NFT (sandbox) ---------- */
+async function onMintNft(){
+  if (!currentUser){ alert("Please login first."); return; }
+  if (!(await ensurePaymentsScope())) return;
+
+  try {
+    const paymentData = {
+      // sandbox-friendly demo payment
+      amount: 1,
+      memo: "Musiq Studio – Mint demo",
+      metadata: { feature: "mint_demo", user: currentUser.username }
+    };
+
+    await Pi.createPayment(paymentData, {
+      onReadyForServerApproval: async (paymentId) => {
+        log("onReadyForServerApproval: " + paymentId);
+        setStatus("⏳ Approving payment…");
+        // TODO: call your Netlify Function to approve on server (stubbed)
+        // await fetch('/.netlify/functions/approve-payment', { method:'POST', body: JSON.stringify({ paymentId }) });
+      },
+      onReadyForServerCompletion: async (paymentId, txId) => {
+        log("onReadyForServerCompletion: " + paymentId + " tx=" + txId);
+        setStatus("✅ Payment completed! ID: " + paymentId + ", tx: " + txId);
+        // OPTIONAL: update your local Pi total and/or create a "Minted Item" card here
+      },
+      onCancel: (paymentId) => {
+        log("Payment cancelled: " + paymentId);
+        setStatus("❌ Payment cancelled.");
+      },
+      onError: (error, paymentId) => {
+        console.error("Payment error:", error, paymentId);
+        setStatus("❌ Payment error: " + (error?.message || error));
+        alert("Payment error: " + (error?.message || error));
       }
-    }
+    });
 
-    // ---------- Market (placeholder) ----------
-    function onMarket() {
-      alert("Market page coming soon.");
-      log("🛍️ Market placeholder");
-      Activity.add('market_click');
-      // e.g., location.href = "/market.html";
-    }
+  } catch (e) {
+    console.error("Mint error:", e);
+    alert("Mint failed: " + (e?.message || e));
+  }
+}
 
-    // ---------- Pi Total (placeholder) ----------
-    function showPiTotal() {
-      alert(`Pi Total (local placeholder): ${PiTotal.get()} \u03C0`);
-      log(`ℹ️ Pi Total shown: ${PiTotal.get()} π (placeholder)`);
-      Activity.add('pi_total_view', { total: PiTotal.get() });
-    }
+/* ---------- simple stubs so buttons don't error ---------- */
+function onLoadTrack(){
+  // Opens a file picker and previews audio if you have <audio id="preview-audio">
+  const input = document.createElement("input");
+  input.type = "file"; input.accept = "audio/*";
+  input.onchange = () => {
+    const f = input.files?.[0]; if (!f) return;
+    const url = URL.createObjectURL(f);
+    const audio = $("preview-audio");
+    if (audio){ audio.src = url; audio.style.display = "block"; audio.play().catch(()=>{}); }
+    setStatus("📂 Loaded: " + f.name);
+  };
+  input.click();
+}
+let mediaRecorder = null, mediaStream = null, recordedChunks = [], recording = false;
+async function startRecording(){
+  try{
+    if (recording) return;
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaStream = stream; recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+    mediaRecorder.ondataavailable = e => { if (e.data.size) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunks, { type: "audio/webm" });
+      const url = URL.createObjectURL(blob);
+      const audio = $("preview-audio");
+      if (audio){ audio.src = url; audio.style.display = "block"; }
+      setStatus("⏹️ Recording stopped; preview ready.");
+    };
+    mediaRecorder.start();
+    recording = true;
+    setStatus("🎤 Recording…");
+  }catch(e){
+    console.error(e);
+    alert("Mic permission failed.");
+  }
+}
+function stopRecording(){
+  if (!recording) return;
+  mediaRecorder?.stop();
+  mediaStream?.getTracks()?.forEach(t=>t.stop());
+  recording = false;
+}
+function onToggleRecord(){ recording ? stopRecording() : startRecording(); }
+function onMarket(){ location.href = "/market.html"; }
+function onPiTotal(){ alert("Pi Total (placeholder)"); }
 
-    function updatePiTotalUI() {
-      const btn = byId("btn-pi-total");
-      if (btn) btn.textContent = `Pi Total: ${PiTotal.get()} \u03C0`;
-    }
+/* ---------- wire up on load ---------- */
+window.addEventListener("load", () => {
+  initPiSdk();
+  enableActions(false); // locked until login
 
-    // ---------- Helpers ----------
-    function byId(id){ return document.getElementById(id); }
-    function log(msg){
-      console.log(msg);
-      const el = byId("status");
-      if (el) el.innerHTML = msg;
-    }
-    function setPill(text, ok) {
-      const pill = byId("sdk-pill");
-      if (!pill) return;
-      pill.textContent = text;
-      pill.className = "pill" + (ok ? "" : " bad");
-    }
+  // Hook up buttons if they exist in your HTML
+  $("btn-login") && ($("btn-login").onclick = loginWithPi);
+  $("btn-mint") && ($("btn-mint").onclick = onMintNft);
+  $("btn-load") && ($("btn-load").onclick = onLoadTrack);
+  $("btn-record") && ($("btn-record").onclick = onToggleRecord);
+  $("btn-start-recording") && ($("btn-start-recording").onclick = startRecording);
+  $("btn-stop-recording") && ($("btn-stop-recording").onclick = stopRecording);
+  $("btn-market") && ($("btn-market").onclick = onMarket);
+  $("btn-pi-total") && ($("btn-pi-total").onclick = onPiTotal);
+});
+</script>
+<!-- END APP SCRIPT -->
 
-    // For console:
-    // Activity.dump()  -> view log
-    // Activity.clear() -> clear log
-  </script>
+
+
 <script>
   async function runPiSandboxCheck() {
     const el = document.getElementById('pi-sandbox-check');
