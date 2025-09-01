@@ -252,24 +252,29 @@ function stopTimer() {
       updatePiTotalUI();
     });
 
-    // ---------- Auth ----------
     async function loginWithPi() {
-      try {
-        if (!window.Pi) return alert("Pi SDK not ready. Use Pi Browser.");
-        const auth = await Pi.authenticate(['username']); // simple scope for now
-        currentUser = auth.user;
-        byId("welcome-message").innerHTML =
-          `Welcome, <strong>${currentUser.username}</strong> &#127881;`; // 🎉
-        enableActions(true);
-        log("&#9989; Auth success for " + currentUser.username);
-        Activity.add('login_success');
-      } catch (e) {
-        console.error(e);
-        log("&#10060; Login failed: " + (e?.message || e));
-        alert("Login failed: " + (e?.message || e));
-        Activity.add('login_failed', { error: String(e?.message || e) });
-      }
-    }
+  if (!window.Pi) {
+    alert("Pi SDK not ready. Open in Pi Browser.");
+    return;
+  }
+  try {
+    // ✅ Now ask for both username + payments
+    const scopes = ['username', 'payments'];
+    const auth = await Pi.authenticate(scopes);
+
+    // Show success in your UI
+    const user = auth?.user?.username || 'Pioneer';
+    document.getElementById("status").textContent = `✅ Logged in as ${user}`;
+    console.log("Auth success:", auth);
+
+    // (Re-enable buttons or other UI here if you disabled them before login)
+
+  } catch (e) {
+    console.error("Auth error:", e);
+    alert("Login failed: " + (e?.message || e));
+  }
+}
+
 
     function enableActions(enabled) {
       [
