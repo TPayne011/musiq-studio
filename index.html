@@ -228,17 +228,24 @@ async function onMintNft(){
 
     await Pi.createPayment(paymentData, {
       onReadyForServerApproval: async (paymentId) => {
-        log("onReadyForServerApproval: " + paymentId);
-        setStatus("⏳ Approving payment…");
-        // TODO: call your Netlify Function to approve on server (stubbed)
-        // await fetch('/.netlify/functions/approve-payment', { method:'POST', body: JSON.stringify({ paymentId }) });
-      },
-      onReadyForServerCompletion: async (paymentId, txId) => {
-        log("onReadyForServerCompletion: " + paymentId + " tx=" + txId);
-        setStatus("✅ Payment completed! ID: " + paymentId + ", tx: " + txId);
-        // OPTIONAL: update your local Pi total and/or create a "Minted Item" card here
-      },
-      onCancel: (paymentId) => {
+  setStatus("⏳ Approving payment…");
+  await fetch('/.netlify/functions/approve-payment', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify({ paymentId })
+  });
+},
+   onReadyForServerCompletion: async (paymentId, txId) => {
+  setStatus("⏳ Completing payment…");
+  await fetch('/.netlify/functions/complete-payment', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify({ paymentId, txId })
+  });
+  setStatus(`✅ Payment completed! ID: ${paymentId}${txId ? `, tx: ${txId}` : ""}`);
+  // (Optional) add your Minted Item card / Pi Total update here
+},
+   onCancel: (paymentId) => {
         log("Payment cancelled: " + paymentId);
         setStatus("❌ Payment cancelled.");
       },
