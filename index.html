@@ -53,6 +53,10 @@
       width: min(900px, 95vw);
     }
     #status { color: var(--muted); margin: 8px 0 0; }
+    
+    
+    
+
 
 /* 🔔 Audio Studio timer styles */
 
@@ -95,6 +99,11 @@
     </div>
     <p id="welcome-message"></p>
     <p id="status">Initializing…</p>
+
+    <!-- Self-check UI -->
+<div id="pi-sandbox-check" style="margin:12px 0; font-size:14px;"></div>
+
+  
   </div>
 
   <!-- Actions card -->
@@ -138,6 +147,51 @@
     let mediaRecorder = null;
     let recording = false;
     let recordedChunks = [];
+// --- Audio Studio timer state ---
+let recInterval = null;   // setInterval handle
+let recStartMs = 0;       // when the current recording started
+let elapsedMs = 0;        // last measured duration (kept when stopped)
+
+function setRecStatus(txt, cls = "") {
+  const s = document.getElementById("rec-status");
+  if (!s) return;
+  s.textContent = txt;
+  s.className = cls ? cls : "";
+}
+
+function setRecTime(ms) {
+  const t = document.getElementById("rec-timer");
+  if (!t) return;
+  const totalSec = Math.floor(ms / 1000);
+  const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
+  const ss = String(totalSec % 60).padStart(2, "0");
+  t.textContent = `${mm}:${ss}`;
+}
+
+function startTimer() {
+  // fresh start
+  elapsedMs = 0;
+  recStartMs = Date.now();
+  setRecStatus("Recording… 🎤", "rec");
+  setRecTime(0);
+
+  recInterval = setInterval(() => {
+    const now = Date.now();
+    const ms = now - recStartMs;
+    setRecTime(ms);
+  }, 250);
+}
+
+function stopTimer() {
+  if (recInterval) {
+    clearInterval(recInterval);
+    recInterval = null;
+  }
+  // freeze display at final elapsed
+  elapsedMs = Date.now() - recStartMs;
+  setRecStatus("Stopped ⏹️", "stop");
+}
+
 
     // Local "Pi Total" placeholder (until real payments)
     const PiTotal = {
@@ -282,6 +336,9 @@
         };
         mediaRecorder.start();
         recording = true;
+    // 🔔 START the Audio Studio 
+    startTimer();
+
         log("🎤 Recording…");
         Activity.add('record_start');
       } catch (e) {
@@ -297,7 +354,11 @@
       mediaRecorder?.stop();
       mediaStream?.getTracks()?.forEach(t => t.stop());
       recording = false;
-    }
+
+     // 🔔 STOP the Audio Studio 
+     stopTimer();
+
+  }
 
     // ---------- Mint NFT: sandbox payment flow ----------
     async function onMintNft() {
@@ -374,5 +435,48 @@
     // Activity.dump()  -> view log
     // Activity.clear() -> clear log
   </script>
+<script>
+  async function runPiSandboxCheck() {
+    const el = document.getElementById('pi-sandbox-check');
+    const rows = [];
+    function row(ok, msg){ rows.push(`<div>${ok ? '✅' : '❌'} ${msg}</div>`); }
+
+    // 1) Pi Browser / SDK
+    const isPiBrowser = /PiBrowser/i.test(navigator.userAgent);
+    row(isPiBrowser, `Pi Browser detected (${navigator.userAgent})`);
+    const sdkLoaded = !!window.Pi;
+    row(sdkLoaded, 'Pi SDK loaded (window.Pi)');
+
+    // 2) Init sanity
+    let initOK = false;
+    try { 
+      if (sdkLoaded) { Pi.init({ version: "2.0", sandbox: true }); initOK = true; } 
+    } catch(e){}
+    row(initOK, 'Pi.init executed (sandbox mode)');
+
+    // 3) Auth + Payments present
+    row(!!(sdkLoaded && Pi.authenticate), 'Pi.authenticate available');
+    row(!!(sdkLoaded && Pi.createPayment), 'Pi.createPayment available');
+
+    // 4) Legal pages + validation key
+    async function urlOk(u){
+      try { const r = await fetch(u, {method:'HEAD'}); return r.ok; } catch { return false; }
+    }
+    const privacyOk = await urlOk('/privacy.html');
+    row(privacyOk, 'Privacy Policy reachable (/privacy.html)');
+    const termsOk = await urlOk('/terms.html');
+    row(termsOk, 'Terms reachable (/terms.html)');
+    const valOk = await urlOk('/validation-key.txt');
+    row(valOk, 'validation-key.txt reachable');
+
+    el.innerHTML = `<div style="padding:10px;border:1px solid #eee;border-radius:8px;background:#fafafa">
+      <strong>Pi Sandbox Readiness</strong>
+      ${rows.join('')}
+    </div>`;
+    console.log('Pi Sandbox Readiness Report:\n' + rows.map(r=>r.replace(/<[^>]*>/g,'')).join('\n'));
+  }
+  window.addEventListener('load', runPiSandboxCheck);
+</script>
+
 </body>
 </html>
