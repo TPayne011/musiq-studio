@@ -229,23 +229,47 @@ async function onMintNft(){
     await Pi.createPayment(paymentData, {
       onReadyForServerApproval: async (paymentId) => {
   setStatus("⏳ Approving payment…");
-  await fetch('/.netlify/functions/approve-payment', {
+  console.log("[CLIENT] Approve start", { paymentId });
+
+  const r = await fetch('/.netlify/functions/approve-payment', {
     method: 'POST',
     headers: { 'Content-Type':'application/json' },
     body: JSON.stringify({ paymentId })
   });
+
+  const t = await r.text();
+  console.log("[CLIENT] Approve response", r.status, t);
+  if (!r.ok) {
+    setStatus(`❌ Approve failed: ${r.status}`);
+    alert(`Approve failed: ${r.status}\n${t}`);
+    // Optionally cancel here:
+    // Pi.cancelPayment(paymentId);
+    return;
+  }
 },
-   onReadyForServerCompletion: async (paymentId, txId) => {
+
+ onReadyForServerCompletion: async (paymentId, txId) => {
   setStatus("⏳ Completing payment…");
-  await fetch('/.netlify/functions/complete-payment', {
+  console.log("[CLIENT] Complete start", { paymentId, txId });
+
+  const r = await fetch('/.netlify/functions/complete-payment', {
     method: 'POST',
     headers: { 'Content-Type':'application/json' },
     body: JSON.stringify({ paymentId, txId })
   });
+
+  const t = await r.text();
+  console.log("[CLIENT] Complete response", r.status, t);
+  if (!r.ok) {
+    setStatus(`❌ Complete failed: ${r.status}`);
+    alert(`Complete failed: ${r.status}\n${t}`);
+    return;
+  }
+
   setStatus(`✅ Payment completed! ID: ${paymentId}${txId ? `, tx: ${txId}` : ""}`);
-  // (Optional) add your Minted Item card / Pi Total update here
 },
-   onCancel: (paymentId) => {
+
+  onCancel: (paymentId) => {
         log("Payment cancelled: " + paymentId);
         setStatus("❌ Payment cancelled.");
       },
