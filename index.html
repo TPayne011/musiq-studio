@@ -319,14 +319,17 @@
       $('btn-mint').onclick   = onMintNft;
       $('btn-market').onclick = goMarket;
 
-      // gentle banner if not in Pi Browser
-      const ua = navigator.userAgent||'';
-      if(!/PiBrowser/i.test(ua)){
-        const w=document.createElement('div');
-        w.style.cssText="position:fixed;left:0;right:0;top:0;background:#fde68a;color:#111;padding:10px 12px;border-bottom:1px solid #eab308;z-index:99999;text-align:center;font-weight:600";
-        w.innerHTML="Open this site in the <b>Pi Browser</b> app for login & payments.";
-        document.body.appendChild(w);
-      }
+      // Show banner ONLY if SDK truly isn't there
+if (!window.Pi) {
+  const w=document.createElement('div');
+  w.style.cssText="position:fixed;left:0;right:0;top:0;background:#fde68a;color:#111;padding:10px 12px;border-bottom:1px solid #eab308;z-index:99999;text-align:center;font-weight:600";
+  w.innerHTML="Open this site in the <b>Pi Browser</b> app for login & payments.";
+  document.body.appendChild(w);
+  dbg('[CHECK] window.Pi not found — likely not in Pi Browser');
+} else {
+  dbg('[CHECK] window.Pi present — OK to proceed');
+}
+
     });
   </script>
 
