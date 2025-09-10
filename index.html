@@ -110,6 +110,12 @@
             <button class="btn" id="btn-mint">🪙 Mint NFT (1π sandbox)</button>
             <button class="btn" id="btn-market">🛍️ Market</button>
           </div>
+     <div class="media" style="margin-top:10px; gap:8px">
+      <input id="tip-amount" type="number" min="0.1" step="0.1" placeholder="Amount (π)"
+         style="padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);background:#0b1020;color:#f5f7ff;width:150px;">
+      <button class="btn" id="btn-tip">💜 Support with Pi</button>
+    </div>
+
           <!-- Tip shows only if SDK missing / init fails -->
           <p id="pi-tip" style="margin:10px 0 0;color:var(--muted);font-size:13px;display:none">
             Tip: Open this site in the <strong>Pi Browser</strong> for login &amp; payments.
@@ -248,7 +254,49 @@
         setStatus('❌ Mint failed: ' + (e && e.message ? e.message : e));
       }
     }
+    async function onTipPi(){
+  if(!currentUser){ alert('Please login first.'); return; }
+  if(!(await ensurePaymentsScope())) return;
 
+  const raw = document.getElementById('tip-amount').value.trim();
+  const amount = Number(raw);
+  if(!amount || amount <= 0){ alert('Enter a valid amount (e.g., 1.0)'); return; }
+
+  const paymentData = {
+    amount,
+    memo: `Support Musiq Studio (${amount}π)`,
+    metadata: { feature: "tip_jar" }
+  };
+  setStatus('⏳ Creating tip payment…');
+
+  try{
+    await Pi.createPayment(paymentData, {
+      onReadyForServerApproval: async (paymentId) => {
+        setStatus('⏳ Approving tip…');
+        const r = await fetch('/.netlify/functions/approve-payment', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ paymentId })
+        });
+        if(!r.ok){ const t=await r.text(); setStatus('❌ Approve failed: '+r.status); alert(t); }
+      },
+      onReadyForServerCompletion: async (paymentId, txId) => {
+        setStatus('⏳ Completing tip…');
+        const r = await fetch('/.netlify/functions/complete-payment', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ paymentId, txId })
+        });
+        if(!r.ok){ const t=await r.text(); setStatus('❌ Complete failed: '+r.status); alert(t); return; }
+        setStatus(`🎉 Thanks! Tip completed (ID: ${paymentId})`);
+        document.getElementById('tip-amount').value = '';
+      },
+      onCancel: () => setStatus('❌ Tip cancelled.'),
+      onError:  (err) => { setStatus('❌ Tip error: ' + (err?.message||err)); alert('Tip error: ' + (err?.message||err)); }
+    });
+  }catch(e){
+    setStatus('❌ Tip failed: ' + (e?.message||e));
+  }
+ }
+ 
     // --- Simple audio tools (load, record, timer) ---
     let mediaRecorder=null, mediaStream=null, recordedChunks=[], recording=false, timerInt=null, tSec=0;
     function fmtTime(s){ const m=Math.floor(s/60).toString().padStart(2,'0'); const ss=(s%60).toString().padStart(2,'0'); return m+':'+ss; }
@@ -305,6 +353,7 @@
       $('btn-record').onclick = toggleRecord;
       $('btn-mint').onclick   = onMintNft;
       $('btn-market').onclick = goMarket;
+      $('btn-tip').onclick = onTipPi;
 
       // safety: if SDK still not ready shortly after load, show tip
       setTimeout(()=>{ if(!piReady){ const tip=$('pi-tip'); if(tip) tip.style.display='block'; }}, 300);
