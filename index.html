@@ -73,6 +73,10 @@
     }
     footer a{ color:#a5f3fc; text-decoration:none }
     footer a:hover{ text-decoration:underline }
+    @keyframes fall {
+  to { transform: translateY(120vh) rotate(360deg); opacity:0; }
+}
+
   </style>
 </head>
 <body>
@@ -239,6 +243,8 @@
                 return;
               }
               setStatus('✅ Payment completed! ID: ' + paymentId + (txId ? (', tx: ' + txId) : ''));
+              celebrate();
+
             }catch(err){
               setStatus('❌ Complete fetch error');
             }
@@ -266,8 +272,14 @@
     amount,
     memo: `Support Musiq Studio (${amount}π)`,
     metadata: { feature: "tip_jar" }
+   
+ 
   };
-  setStatus('⏳ Creating tip payment…');
+  setStatus(`🎉 Thanks! Tip completed (ID: ${paymentId})`);
+document.getElementById('tip-amount').value = '';
+celebrate();
+
+
 
   try{
     await Pi.createPayment(paymentData, {
@@ -358,6 +370,22 @@
       // safety: if SDK still not ready shortly after load, show tip
       setTimeout(()=>{ if(!piReady){ const tip=$('pi-tip'); if(tip) tip.style.display='block'; }}, 300);
     });
+    // --- Confetti (emoji burst) ---
+function celebrate(){
+  const emojis = ['🎉','🎶','🚀','💜','✨','🔥'];
+  for(let i=0; i<25; i++){
+    const span = document.createElement('span');
+    span.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    span.style.position = 'fixed';
+    span.style.left = (Math.random()*100)+'%';
+    span.style.top = '-20px';
+    span.style.fontSize = (16+Math.random()*24)+'px';
+    span.style.animation = 'fall 2.5s linear forwards';
+    document.body.appendChild(span);
+    setTimeout(()=>span.remove(), 2600);
+  }
+}
+
   </script>
 </body>
 </html>
