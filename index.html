@@ -113,18 +113,33 @@
   <header>
 export default function Home() {
   return (
-    <header className="ms-header">
-      <img
-        src="/logo/musiqstudio-logo.jpg"   // adjust filename if needed
-        alt="Musiq Studio logo"
-        className="ms-logo"
-      />
-      <h1 className="ms-title">
-        Musiq Studio <span className="ms-on-pi">on Pi</span>
-      </h1>
-    </header>
-  )
+    <div className="container">
+      {/* Header: single line (logo + text) */}
+      <header className="ms-header">
+        <img
+          src="/logo/musiqstudio-logo.jpg"  // ensure this file exists in /public/logo/
+          alt="Musiq Studio logo"
+          className="ms-logo"
+        />
+        <h1 className="ms-title">
+          Musiq Studio <span className="ms-on-pi">on Pi</span>
+        </h1>
+      </header>
+
+      {/* Your existing page content below */}
+      <main>
+        <p>Create • Record • Mint • Trade — powered by Pi Network</p>
+
+        {/* Login block (keep your real components here) */}
+        <section>
+          <button>🔑 Login with Pi</button>
+          <p>Not signed in</p>
+        </section>
+      </main>
+    </div>
+  );
 }
+
 
 
     <p class="subtitle">Create • Record • Mint • Trade — powered by Pi Network</p>
