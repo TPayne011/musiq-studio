@@ -28,6 +28,19 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        import Footer from "./Footer";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <Footer />
+      </body>
+    </html>
+  );
+}
+
       </body>
     </html>
   );
