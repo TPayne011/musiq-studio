@@ -1,451 +1,687 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Musiq Studio on Pi</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <head>
+    <meta charset="utf-8" />
+    <title>Musiq Studio on Pi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Pi SDK -->
-  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    <!-- Pi SDK -->
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 
-  <style>
-    :root{
-      --bg1:#0f1020; --bg2:#1b1636; --card:#ffffff15; --stroke:#ffffff22; --text:#f5f7ff;
-      --accent:#8b5cf6; --accent2:#22d3ee; --muted:#c4c7d1; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444;
-      --btn:#ffffff14; --btn-hover:#ffffff25;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0; color:var(--text);
-      background: radial-gradient(1200px 700px at 10% -10%, #322b63 0%, transparent 60%),
-                  radial-gradient(1200px 700px at 110% 20%, #0ea5e9 0%, transparent 55%),
-                  linear-gradient(160deg, var(--bg1), var(--bg2));
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
-    }
-    header{ padding:28px 20px 8px; text-align:center; }
-    .title{
-      font-size: clamp(28px, 3.8vw, 44px); font-weight:800; letter-spacing:.3px; margin:0;
-      background: linear-gradient(90deg, #fff 0%, #d1d5ff 40%, #a5f3fc 100%);
-      -webkit-background-clip: text; background-clip:text; color:transparent;
-    }
-    .subtitle{ margin:6px 0 0; color:var(--muted); font-size:14px; }
-
-    .wrap{ max-width:1000px; margin:24px auto 70px; padding:0 16px; }
-    .card{
-      background: var(--card); backdrop-filter: blur(10px);
-      border:1px solid var(--stroke); border-radius:16px; padding:18px;
-      box-shadow: 0 10px 30px #00000030;
-    }
-
-    .toolbar{ display:flex; flex-wrap:wrap; gap:10px; margin:10px 0 6px; }
-    .btn{
-      appearance:none; border:1px solid var(--stroke); background:var(--btn);
-      color:var(--text); padding:10px 14px; border-radius:10px; cursor:pointer;
-      font-weight:600; letter-spacing:.2px; transition:.15s transform, .15s background;
-    }
-    .btn:hover{ background:var(--btn-hover); transform: translateY(-1px); }
-    .btn:active{ transform: translateY(0); }
-    .btn:disabled{ opacity:.55; cursor:not-allowed; transform:none }
-    .btn-primary{ border-color:transparent; background: linear-gradient(90deg, var(--accent), var(--accent2)); color:#0b1020; }
-    .btn-primary:hover{ filter:brightness(1.06); }
-
-    .status{
-      display:flex; align-items:center; gap:8px;
-      padding:10px 12px; margin:8px 0 14px;
-      background:#0b1222; border:1px solid #203055; border-radius:12px; font-size:14px;
-      min-height:40px;
-    }
-    .chip{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; border:1px solid var(--stroke); background:#ffffff10; font-size:12px; color:var(--muted)}
-    .ok{ color:var(--ok) } .warn{ color:var(--warn) } .err{ color:var(--err) }
-
-    .grid{ display:grid; grid-template-columns: 1.2fr .8fr; gap:14px; }
-    @media (max-width:900px){ .grid{ grid-template-columns: 1fr; } }
-
-    .panel{ background:#0b1020aa; border:1px solid var(--stroke); border-radius:14px; padding:14px; }
-    .panel h3{ margin:0 0 10px; font-size:16px; color:#dbeafe; letter-spacing:.3px }
-
-    .media{ display:flex; align-items:center; gap:10px; flex-wrap:wrap }
-    audio{ width:100%; margin-top:8px }
-
-    footer{
-      max-width:1000px; margin:18px auto 90px; padding:0 16px; color:var(--muted); font-size:13px; text-align:center;
-    }
-    footer a{ color:#a5f3fc; text-decoration:none }
-    footer a:hover{ text-decoration:underline }
-    @keyframes fall {
-  to { transform: translateY(120vh) rotate(360deg); opacity:0; }
-   }
-.logo {
-  width: 120px;   /* adjust as needed */
-  height: auto;
-  display: block;
-  margin: 20px auto;  /* centers the logo */
-}
-.ms-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-}
-
-.ms-logo {
-  width: 48px;   /* tweak size if needed */
-  height: auto;
-}
-
-.ms-title {
-  margin: 0;
-  font-size: 1.8rem;   /* ~29px */
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.ms-on-pi {
-  font-weight: 600;
-  color: #8b5cf6;   /* accent purple (you can change to match logo theme) */
-}
-
-
-  </style>
-</head>
-<body>
-  <header>
-export default function Home() {
-  return (
-    <div className="container">
-      {/* Header: single line (logo + text) */}
-      <header className="ms-header">
-        <img
-          src="/logo/musiqstudio-logo.jpg"  // ensure this file exists in /public/logo/
-          alt="Musiq Studio logo"
-          className="ms-logo"
-        />
-        <h1 className="ms-title">
-          Musiq Studio <span className="ms-on-pi">on Pi</span>
-        </h1>
-      </header>
-
-      {/* Your existing page content below */}
-      <main>
-        <p>Create • Record • Mint • Trade — powered by Pi Network</p>
-
-        {/* Login block (keep your real components here) */}
-        <section>
-          <button>🔑 Login with Pi</button>
-          <p>Not signed in</p>
-        </section>
-      </main>
-    </div>
-  );
-}
-
-
-
-    <p class="subtitle">Create • Record • Mint • Trade — powered by Pi Network</p>
-  </header>
-
-  <main class="wrap">
-    <section class="card">
-      <div class="toolbar">
-        <button class="btn btn-primary" id="btn-login">🔑 Login with Pi</button>
-        <span class="chip" id="whoami">Not signed in</span>
-        <span class="chip">SDK: <span id="pi-state">booting…</span></span>
-      </div>
-
-      <div class="status" id="status">Initializing…</div>
-
-      <div class="grid">
-        <!-- Studio panel -->
-        <div class="panel">
-          <h3>Studio</h3>
-          <div class="media">
-            <button class="btn" id="btn-load">📂 Load Track</button>
-            <button class="btn" id="btn-record">🎤 Record / Stop</button>
-            <span class="chip">⏱️ <span id="rec-timer">00:00</span></span>
-          </div>
-          <audio id="preview-audio" controls style="display:none"></audio>
-        </div>
-
-        <!-- Pi panel -->
-        <div class="panel">
-          <h3>Pi Actions</h3>
-          <div class="media">
-            <button class="btn" id="btn-mint">🪙 Mint NFT (1π sandbox)</button>
-            <button class="btn" id="btn-market">🛍️ Market</button>
-          </div>
-     <div class="media" style="margin-top:10px; gap:8px">
-      <input id="tip-amount" type="number" min="0.1" step="0.1" placeholder="Amount (π)"
-         style="padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);background:#0b1020;color:#f5f7ff;width:150px;">
-      <button class="btn" id="btn-tip">💜 Support with Pi</button>
-    </div>
-
-          <!-- Tip shows only if SDK missing / init fails -->
-          <p id="pi-tip" style="margin:10px 0 0;color:var(--muted);font-size:13px;display:none">
-            Tip: Open this site in the <strong>Pi Browser</strong> for login &amp; payments.
-          </p>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer>
-    <p><a href="/privacy.html">Privacy Policy</a> · <a href="/terms.html">Terms of Use</a></p>
-    <p class="tiny">© 2025 Musiq Studio on Pi — crafted with ❤️</p>
-  </footer>
-
-  <script>
-    // --- tiny no-op logger so prior dbg() calls (if any) won't break ---
-    const dbg = () => {};
-
-    // --- DOM helpers ---
-    const $ = (id)=>document.getElementById(id);
-    const setStatus = (html)=>{ $('status').innerHTML = html };
-    const setPiState = (t)=>{ $('pi-state').textContent = t };
-    const setWho = (t)=>{ $('whoami').textContent = t };
-
-    // --- enable/disable action buttons until login ---
-    function enableActions(enabled){
-      ['btn-load','btn-record','btn-mint','btn-market']
-        .forEach(id => { const el = $(id); if(el) el.disabled = !enabled; });
-    }
-
-    // --- Pi SDK init (sandbox) ---
-    let piReady = false;
-    function initPi(){
-      if(!window.Pi){
-        setPiState('❌ not loaded');
-        setStatus('❌ Pi SDK not loaded');
-        const tip = $('pi-tip'); if (tip) tip.style.display = 'block';
-        return;
+    <style>
+      :root {
+        --bg1: #0f1020;
+        --bg2: #1b1636;
+        --card: #ffffff15;
+        --stroke: #ffffff22;
+        --text: #f5f7ff;
+        --accent: #8b5cf6;
+        --accent2: #22d3ee;
+        --muted: #c4c7d1;
+        --ok: #22c55e;
+        --warn: #f59e0b;
+        --err: #ef4444;
+        --btn: #ffffff14;
+        --btn-hover: #ffffff25;
       }
-      try{
-        Pi.init({ version:'2.0', sandbox:true });
-        piReady = true;
-        setPiState('✅ ready (sandbox)');
-        setStatus('✅ Pi SDK initialized (sandbox)');
-        const tip = $('pi-tip'); if (tip) tip.style.display = 'none';
-      }catch(e){
-        setPiState('❌ init error');
-        setStatus('❌ Pi.init failed: ' + (e && e.message ? e.message : e));
-        const tip = $('pi-tip'); if (tip) tip.style.display = 'block';
+      * {
+        box-sizing: border-box;
       }
-    }
-
-    // --- Login (username + payments) ---
-    let currentUser = null;
-    async function loginWithPi(){
-      if(!window.Pi){ alert('Open in Pi Browser to login.'); return; }
-      try{
-        const auth = await Pi.authenticate(['username','payments']);
-        currentUser = auth && auth.user ? auth.user : null;
-        const name = (currentUser && currentUser.username) ? currentUser.username : 'Pioneer';
-        setWho('Signed in: ' + name + ' 🎉');
-        setStatus('✅ Logged in as ' + name);
-        enableActions(true);
-      }catch(e){
-        setStatus('❌ Login failed: ' + (e && e.message ? e.message : e));
+      html,
+      body {
+        height: 100%;
       }
-    }
-
-    // --- Ensure 'payments' scope before minting ---
-    async function ensurePaymentsScope(){
-      try{
-        await Pi.authenticate(['payments']); // no-op if already granted
-        return true;
-      }catch(e){
-        alert("Mint requires 'payments' permission.");
-        return false;
+      body {
+        margin: 0;
+        color: var(--text);
+        background: radial-gradient(
+            1200px 700px at 10% -10%,
+            #322b63 0%,
+            transparent 60%
+          ),
+          radial-gradient(1200px 700px at 110% 20%, #0ea5e9 0%, transparent 55%),
+          linear-gradient(160deg, var(--bg1), var(--bg2));
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+          Arial, "Apple Color Emoji", "Segoe UI Emoji";
       }
-    }
-
-    // --- Mint flow ---
-    async function onMintNft(){
-      if(!currentUser){ alert('Please login first.'); return; }
-      if(!(await ensurePaymentsScope())) return;
-
-      const paymentData = {
-        amount: 1,
-        memo: "Musiq Studio – Mint demo",
-        metadata: { feature: "mint_demo" }
-      };
-
-      try{
-        await Pi.createPayment(paymentData, {
-          onReadyForServerApproval: async (paymentId) => {
-            setStatus('⏳ Approving payment…');
-            try{
-              const r = await fetch('/.netlify/functions/approve-payment', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({ paymentId })
-              });
-              const t = await r.text();
-              if(!r.ok){
-                setStatus('❌ Approve failed: ' + r.status);
-                alert('Approve failed: ' + r.status + '\n' + t);
-                return;
-              }
-            }catch(err){
-              setStatus('❌ Approve fetch error');
-            }
-          },
-          onReadyForServerCompletion: async (paymentId, txId) => {
-            setStatus('⏳ Completing payment…');
-            try{
-              const r = await fetch('/.netlify/functions/complete-payment', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({ paymentId, txId })
-              });
-              const t = await r.text();
-              if(!r.ok){
-                setStatus('❌ Complete failed: ' + r.status);
-                alert('Complete failed: ' + r.status + '\n' + t);
-                return;
-              }
-              setStatus('✅ Payment completed! ID: ' + paymentId + (txId ? (', tx: ' + txId) : ''));
-              celebrate();
-
-            }catch(err){
-              setStatus('❌ Complete fetch error');
-            }
-          },
-          onCancel: (paymentId) => { setStatus('❌ Payment cancelled.'); },
-          onError:  (error, paymentId) => {
-            const msg = (error && error.message) ? error.message : String(error);
-            setStatus('❌ Payment error: ' + msg);
-            alert('Payment error: ' + msg);
-          }
-        });
-      }catch(e){
-        setStatus('❌ Mint failed: ' + (e && e.message ? e.message : e));
+      header {
+        padding: 28px 20px 8px;
+        text-align: center;
       }
-    }
-    async function onTipPi(){
-  if(!currentUser){ alert('Please login first.'); return; }
-  if(!(await ensurePaymentsScope())) return;
+      .title {
+        font-size: clamp(28px, 3.8vw, 44px);
+        font-weight: 800;
+        letter-spacing: 0.3px;
+        margin: 0;
+        background: linear-gradient(90deg, #fff 0%, #d1d5ff 40%, #a5f3fc 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .subtitle {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
 
-  const raw = document.getElementById('tip-amount').value.trim();
-  const amount = Number(raw);
-  if(!amount || amount <= 0){ alert('Enter a valid amount (e.g., 1.0)'); return; }
+      .wrap {
+        max-width: 1000px;
+        margin: 24px auto 70px;
+        padding: 0 16px;
+      }
+      .card {
+        background: var(--card);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--stroke);
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 10px 30px #00000030;
+      }
 
-  const paymentData = {
-    amount,
-    memo: `Support Musiq Studio (${amount}π)`,
-    metadata: { feature: "tip_jar" }
-   
- 
-  };
-  setStatus(`🎉 Thanks! Tip completed (ID: ${paymentId})`);
-document.getElementById('tip-amount').value = '';
-celebrate();
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 10px 0 6px;
+      }
+      .btn {
+        appearance: none;
+        border: 1px solid var(--stroke);
+        background: var(--btn);
+        color: var(--text);
+        padding: 10px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 600;
+        letter-spacing: 0.2px;
+        transition: 0.15s transform, 0.15s background;
+      }
+      .btn:hover {
+        background: var(--btn-hover);
+        transform: translateY(-1px);
+      }
+      .btn:active {
+        transform: translateY(0);
+      }
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .btn-primary {
+        border-color: transparent;
+        background: linear-gradient(90deg, var(--accent), var(--accent2));
+        color: #0b1020;
+      }
+      .btn-primary:hover {
+        filter: brightness(1.06);
+      }
 
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        margin: 8px 0 14px;
+        background: #0b1222;
+        border: 1px solid #203055;
+        border-radius: 12px;
+        font-size: 14px;
+        min-height: 40px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--stroke);
+        background: #ffffff10;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .ok {
+        color: var(--ok);
+      }
+      .warn {
+        color: var(--warn);
+      }
+      .err {
+        color: var(--err);
+      }
 
-
-  try{
-    await Pi.createPayment(paymentData, {
-      onReadyForServerApproval: async (paymentId) => {
-        setStatus('⏳ Approving tip…');
-        const r = await fetch('/.netlify/functions/approve-payment', {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ paymentId })
-        });
-        if(!r.ok){ const t=await r.text(); setStatus('❌ Approve failed: '+r.status); alert(t); }
-      },
-      onReadyForServerCompletion: async (paymentId, txId) => {
-        setStatus('⏳ Completing tip…');
-        const r = await fetch('/.netlify/functions/complete-payment', {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ paymentId, txId })
-        });
-        if(!r.ok){ const t=await r.text(); setStatus('❌ Complete failed: '+r.status); alert(t); return; }
-        setStatus(`🎉 Thanks! Tip completed (ID: ${paymentId})`);
-        document.getElementById('tip-amount').value = '';
-      },
-      onCancel: () => setStatus('❌ Tip cancelled.'),
-      onError:  (err) => { setStatus('❌ Tip error: ' + (err?.message||err)); alert('Tip error: ' + (err?.message||err)); }
-    });
-  }catch(e){
-    setStatus('❌ Tip failed: ' + (e?.message||e));
-  }
- }
- 
-    // --- Simple audio tools (load, record, timer) ---
-    let mediaRecorder=null, mediaStream=null, recordedChunks=[], recording=false, timerInt=null, tSec=0;
-    function fmtTime(s){ const m=Math.floor(s/60).toString().padStart(2,'0'); const ss=(s%60).toString().padStart(2,'0'); return m+':'+ss; }
-    function startTimer(){ clearInterval(timerInt); tSec=0; $('rec-timer').textContent=fmtTime(0); timerInt=setInterval(()=>{ $('rec-timer').textContent=fmtTime(++tSec); },1000); }
-    function stopTimer(){ clearInterval(timerInt); }
-
-    function onLoadTrack(){
-      const input=document.createElement('input'); input.type='file'; input.accept='audio/*';
-      input.onchange=()=>{
-        const f=input.files && input.files[0]; if(!f) return;
-        const url=URL.createObjectURL(f);
-        const audio=$('preview-audio'); audio.src=url; audio.style.display='block';
-        audio.play().catch(()=>{});
-        setStatus('📂 Loaded: ' + f.name);
-      };
-      input.click();
-    }
-
-    async function toggleRecord(){
-      const audio=$('preview-audio');
-      if(!recording){
-        try{
-          const s = await navigator.mediaDevices.getUserMedia({audio:true});
-          mediaStream = s; recordedChunks = [];
-          mediaRecorder = new MediaRecorder(s);
-          mediaRecorder.ondataavailable = e => { if(e.data.size) recordedChunks.push(e.data); };
-          mediaRecorder.onstop = () => {
-            const blob = new Blob(recordedChunks, {type:'audio/webm'});
-            const url = URL.createObjectURL(blob);
-            audio.src = url; audio.style.display='block';
-            setStatus('⏹️ Recording stopped; preview ready.');
-          };
-          mediaRecorder.start(); recording=true; startTimer();
-          setStatus('🎤 Recording…');
-        }catch(e){
-          alert('Microphone permission failed.');
+      .grid {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 14px;
+      }
+      @media (max-width: 900px) {
+        .grid {
+          grid-template-columns: 1fr;
         }
-      }else{
-        mediaRecorder && mediaRecorder.stop();
-        mediaStream && mediaStream.getTracks().forEach(t=>t.stop());
-        recording=false; stopTimer();
       }
-    }
 
-    // --- Nav ---
-    function goMarket(){ location.href='/market.html'; }
+      .panel {
+        background: #0b1020aa;
+        border: 1px solid var(--stroke);
+        border-radius: 14px;
+        padding: 14px;
+      }
+      .panel h3 {
+        margin: 0 0 10px;
+        font-size: 16px;
+        color: #dbeafe;
+        letter-spacing: 0.3px;
+      }
 
-    // --- Wire up on load ---
-    window.addEventListener('load', ()=>{
-      enableActions(false);
-      initPi();
-      $('btn-login').onclick  = loginWithPi;
-      $('btn-load').onclick   = onLoadTrack;
-      $('btn-record').onclick = toggleRecord;
-      $('btn-mint').onclick   = onMintNft;
-      $('btn-market').onclick = goMarket;
-      $('btn-tip').onclick = onTipPi;
+      .media {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      audio {
+        width: 100%;
+        margin-top: 8px;
+      }
 
-      // safety: if SDK still not ready shortly after load, show tip
-      setTimeout(()=>{ if(!piReady){ const tip=$('pi-tip'); if(tip) tip.style.display='block'; }}, 300);
-    });
-    // --- Confetti (emoji burst) ---
-function celebrate(){
-  const emojis = ['🎉','🎶','🚀','💜','✨','🔥'];
-  for(let i=0; i<25; i++){
-    const span = document.createElement('span');
-    span.textContent = emojis[Math.floor(Math.random()*emojis.length)];
-    span.style.position = 'fixed';
-    span.style.left = (Math.random()*100)+'%';
-    span.style.top = '-20px';
-    span.style.fontSize = (16+Math.random()*24)+'px';
-    span.style.animation = 'fall 2.5s linear forwards';
-    document.body.appendChild(span);
-    setTimeout(()=>span.remove(), 2600);
-  }
-}
+      footer {
+        max-width: 1000px;
+        margin: 18px auto 90px;
+        padding: 0 16px;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+      }
+      footer a {
+        color: #a5f3fc;
+        text-decoration: none;
+      }
+      footer a:hover {
+        text-decoration: underline;
+      }
+      @keyframes fall {
+        to {
+          transform: translateY(120vh) rotate(360deg);
+          opacity: 0;
+        }
+      }
+      .logo {
+        width: 120px; /* adjust as needed */
+        height: auto;
+        display: block;
+        margin: 20px auto; /* centers the logo */
+      }
+      .ms-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+      }
 
-  </script>
-</body>
+      .ms-logo {
+        width: 48px; /* tweak size if needed */
+        height: auto;
+      }
+
+      .ms-title {
+        margin: 0;
+        font-size: 1.8rem; /* ~29px */
+        font-weight: 800;
+        line-height: 1.2;
+      }
+
+      .ms-on-pi {
+        font-weight: 600;
+        color: #8b5cf6; /* accent purple (you can change to match logo theme) */
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      export default function Home() { return (
+      <div className="container">
+        {/* Header: single line (logo + text) */}
+        <header className="ms-header">
+          <img src="/logo/musiqstudio-logo.jpg" // ensure this file exists in
+          /public/logo/ alt="Musiq Studio logo" className="ms-logo" />
+          <h1 className="ms-title">
+            Musiq Studio <span className="ms-on-pi">on Pi</span>
+          </h1>
+        </header>
+
+        {/* Your existing page content below */}
+        <main>
+          <p>Create • Record • Mint • Trade — powered by Pi Network</p>
+
+          {/* Login block (keep your real components here) */}
+          <section>
+            <button>🔑 Login with Pi</button>
+            <p>Not signed in</p>
+          </section>
+        </main>
+      </div>
+      ); }
+
+      <p class="subtitle">
+        Create • Record • Mint • Trade — powered by Pi Network
+      </p>
+    </header>
+
+    <main class="wrap">
+      <section class="card">
+        <div class="toolbar">
+          <button class="btn btn-primary" id="btn-login">
+            🔑 Login with Pi
+          </button>
+          <span class="chip" id="whoami">Not signed in</span>
+          <span class="chip">SDK: <span id="pi-state">booting…</span></span>
+        </div>
+
+        <div class="status" id="status">Initializing…</div>
+
+        <div class="grid">
+          <!-- Studio panel -->
+          <div class="panel">
+            <h3>Studio</h3>
+            <div class="media">
+              <button class="btn" id="btn-load">📂 Load Track</button>
+              <button class="btn" id="btn-record">🎤 Record / Stop</button>
+              <span class="chip">⏱️ <span id="rec-timer">00:00</span></span>
+            </div>
+            <audio id="preview-audio" controls style="display: none"></audio>
+          </div>
+
+          <!-- Pi panel -->
+          <div class="panel">
+            <h3>Pi Actions</h3>
+            <div class="media">
+              <button class="btn" id="btn-mint">
+                🪙 Mint NFT (1π sandbox)
+              </button>
+              <button class="btn" id="btn-market">🛍️ Market</button>
+            </div>
+            <div class="media" style="margin-top: 10px; gap: 8px">
+              <input
+                id="tip-amount"
+                type="number"
+                min="0.1"
+                step="0.1"
+                placeholder="Amount (π)"
+                style="
+                  padding: 10px 12px;
+                  border-radius: 10px;
+                  border: 1px solid var(--stroke);
+                  background: #0b1020;
+                  color: #f5f7ff;
+                  width: 150px;
+                "
+              />
+              <button class="btn" id="btn-tip">💜 Support with Pi</button>
+            </div>
+
+            <!-- Tip shows only if SDK missing / init fails -->
+            <p
+              id="pi-tip"
+              style="
+                margin: 10px 0 0;
+                color: var(--muted);
+                font-size: 13px;
+                display: none;
+              "
+            >
+              Tip: Open this site in the <strong>Pi Browser</strong> for login
+              &amp; payments.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        <a href="/privacy.html">Privacy Policy</a> ·
+        <a href="/terms.html">Terms of Use</a>
+      </p>
+      <p class="tiny">© 2025 Musiq Studio on Pi — crafted with ❤️</p>
+    </footer>
+
+    <script>
+      // --- tiny no-op logger so prior dbg() calls (if any) won't break ---
+      const dbg = () => {};
+
+      // --- DOM helpers ---
+      const $ = (id) => document.getElementById(id);
+      const setStatus = (html) => {
+        $("status").innerHTML = html;
+      };
+      const setPiState = (t) => {
+        $("pi-state").textContent = t;
+      };
+      const setWho = (t) => {
+        $("whoami").textContent = t;
+      };
+
+      // --- enable/disable action buttons until login ---
+      function enableActions(enabled) {
+        ["btn-load", "btn-record", "btn-mint", "btn-market"].forEach((id) => {
+          const el = $(id);
+          if (el) el.disabled = !enabled;
+        });
+      }
+
+      // --- Pi SDK init (sandbox) ---
+      let piReady = false;
+      function initPi() {
+        if (!window.Pi) {
+          setPiState("❌ not loaded");
+          setStatus("❌ Pi SDK not loaded");
+          const tip = $("pi-tip");
+          if (tip) tip.style.display = "block";
+          return;
+        }
+        try {
+          Pi.init({ version: "2.0", sandbox: true });
+          piReady = true;
+          setPiState("✅ ready (sandbox)");
+          setStatus("✅ Pi SDK initialized (sandbox)");
+          const tip = $("pi-tip");
+          if (tip) tip.style.display = "none";
+        } catch (e) {
+          setPiState("❌ init error");
+          setStatus("❌ Pi.init failed: " + (e && e.message ? e.message : e));
+          const tip = $("pi-tip");
+          if (tip) tip.style.display = "block";
+        }
+      }
+
+      // --- Login (username + payments) ---
+      let currentUser = null;
+      async function loginWithPi() {
+        if (!window.Pi) {
+          alert("Open in Pi Browser to login.");
+          return;
+        }
+        try {
+          const auth = await Pi.authenticate(["username", "payments"]);
+          currentUser = auth && auth.user ? auth.user : null;
+          const name =
+            currentUser && currentUser.username
+              ? currentUser.username
+              : "Pioneer";
+          setWho("Signed in: " + name + " 🎉");
+          setStatus("✅ Logged in as " + name);
+          enableActions(true);
+        } catch (e) {
+          setStatus("❌ Login failed: " + (e && e.message ? e.message : e));
+        }
+      }
+
+      // --- Ensure 'payments' scope before minting ---
+      async function ensurePaymentsScope() {
+        try {
+          await Pi.authenticate(["payments"]); // no-op if already granted
+          return true;
+        } catch (e) {
+          alert("Mint requires 'payments' permission.");
+          return false;
+        }
+      }
+
+      // --- Mint flow ---
+      async function onMintNft() {
+        if (!currentUser) {
+          alert("Please login first.");
+          return;
+        }
+        if (!(await ensurePaymentsScope())) return;
+
+        const paymentData = {
+          amount: 1,
+          memo: "Musiq Studio – Mint demo",
+          metadata: { feature: "mint_demo" },
+        };
+
+        try {
+          await Pi.createPayment(paymentData, {
+            onReadyForServerApproval: async (paymentId) => {
+              setStatus("⏳ Approving payment…");
+              try {
+                const r = await fetch("/.netlify/functions/approve-payment", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ paymentId }),
+                });
+                const t = await r.text();
+                if (!r.ok) {
+                  setStatus("❌ Approve failed: " + r.status);
+                  alert("Approve failed: " + r.status + "\n" + t);
+                  return;
+                }
+              } catch (err) {
+                setStatus("❌ Approve fetch error");
+              }
+            },
+            onReadyForServerCompletion: async (paymentId, txId) => {
+              setStatus("⏳ Completing payment…");
+              try {
+                const r = await fetch("/.netlify/functions/complete-payment", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ paymentId, txId }),
+                });
+                const t = await r.text();
+                if (!r.ok) {
+                  setStatus("❌ Complete failed: " + r.status);
+                  alert("Complete failed: " + r.status + "\n" + t);
+                  return;
+                }
+                setStatus(
+                  "✅ Payment completed! ID: " +
+                    paymentId +
+                    (txId ? ", tx: " + txId : "")
+                );
+                celebrate();
+              } catch (err) {
+                setStatus("❌ Complete fetch error");
+              }
+            },
+            onCancel: (paymentId) => {
+              setStatus("❌ Payment cancelled.");
+            },
+            onError: (error, paymentId) => {
+              const msg =
+                error && error.message ? error.message : String(error);
+              setStatus("❌ Payment error: " + msg);
+              alert("Payment error: " + msg);
+            },
+          });
+        } catch (e) {
+          setStatus("❌ Mint failed: " + (e && e.message ? e.message : e));
+        }
+      }
+      async function onTipPi() {
+        if (!currentUser) {
+          alert("Please login first.");
+          return;
+        }
+        if (!(await ensurePaymentsScope())) return;
+
+        const raw = document.getElementById("tip-amount").value.trim();
+        const amount = Number(raw);
+        if (!amount || amount <= 0) {
+          alert("Enter a valid amount (e.g., 1.0)");
+          return;
+        }
+
+        const paymentData = {
+          amount,
+          memo: `Support Musiq Studio (${amount}π)`,
+          metadata: { feature: "tip_jar" },
+        };
+        setStatus(`🎉 Thanks! Tip completed (ID: ${paymentId})`);
+        document.getElementById("tip-amount").value = "";
+        celebrate();
+
+        try {
+          await Pi.createPayment(paymentData, {
+            onReadyForServerApproval: async (paymentId) => {
+              setStatus("⏳ Approving tip…");
+              const r = await fetch("/.netlify/functions/approve-payment", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ paymentId }),
+              });
+              if (!r.ok) {
+                const t = await r.text();
+                setStatus("❌ Approve failed: " + r.status);
+                alert(t);
+              }
+            },
+            onReadyForServerCompletion: async (paymentId, txId) => {
+              setStatus("⏳ Completing tip…");
+              const r = await fetch("/.netlify/functions/complete-payment", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ paymentId, txId }),
+              });
+              if (!r.ok) {
+                const t = await r.text();
+                setStatus("❌ Complete failed: " + r.status);
+                alert(t);
+                return;
+              }
+              setStatus(`🎉 Thanks! Tip completed (ID: ${paymentId})`);
+              document.getElementById("tip-amount").value = "";
+            },
+            onCancel: () => setStatus("❌ Tip cancelled."),
+            onError: (err) => {
+              setStatus("❌ Tip error: " + (err?.message || err));
+              alert("Tip error: " + (err?.message || err));
+            },
+          });
+        } catch (e) {
+          setStatus("❌ Tip failed: " + (e?.message || e));
+        }
+      }
+
+      // --- Simple audio tools (load, record, timer) ---
+      let mediaRecorder = null,
+        mediaStream = null,
+        recordedChunks = [],
+        recording = false,
+        timerInt = null,
+        tSec = 0;
+      function fmtTime(s) {
+        const m = Math.floor(s / 60)
+          .toString()
+          .padStart(2, "0");
+        const ss = (s % 60).toString().padStart(2, "0");
+        return m + ":" + ss;
+      }
+      function startTimer() {
+        clearInterval(timerInt);
+        tSec = 0;
+        $("rec-timer").textContent = fmtTime(0);
+        timerInt = setInterval(() => {
+          $("rec-timer").textContent = fmtTime(++tSec);
+        }, 1000);
+      }
+      function stopTimer() {
+        clearInterval(timerInt);
+      }
+
+      function onLoadTrack() {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "audio/*";
+        input.onchange = () => {
+          const f = input.files && input.files[0];
+          if (!f) return;
+          const url = URL.createObjectURL(f);
+          const audio = $("preview-audio");
+          audio.src = url;
+          audio.style.display = "block";
+          audio.play().catch(() => {});
+          setStatus("📂 Loaded: " + f.name);
+        };
+        input.click();
+      }
+
+      async function toggleRecord() {
+        const audio = $("preview-audio");
+        if (!recording) {
+          try {
+            const s = await navigator.mediaDevices.getUserMedia({
+              audio: true,
+            });
+            mediaStream = s;
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(s);
+            mediaRecorder.ondataavailable = (e) => {
+              if (e.data.size) recordedChunks.push(e.data);
+            };
+            mediaRecorder.onstop = () => {
+              const blob = new Blob(recordedChunks, { type: "audio/webm" });
+              const url = URL.createObjectURL(blob);
+              audio.src = url;
+              audio.style.display = "block";
+              setStatus("⏹️ Recording stopped; preview ready.");
+            };
+            mediaRecorder.start();
+            recording = true;
+            startTimer();
+            setStatus("🎤 Recording…");
+          } catch (e) {
+            alert("Microphone permission failed.");
+          }
+        } else {
+          mediaRecorder && mediaRecorder.stop();
+          mediaStream && mediaStream.getTracks().forEach((t) => t.stop());
+          recording = false;
+          stopTimer();
+        }
+      }
+
+      // --- Nav ---
+      function goMarket() {
+        location.href = "/market.html";
+      }
+
+      // --- Wire up on load ---
+      window.addEventListener("load", () => {
+        enableActions(false);
+        initPi();
+        $("btn-login").onclick = loginWithPi;
+        $("btn-load").onclick = onLoadTrack;
+        $("btn-record").onclick = toggleRecord;
+        $("btn-mint").onclick = onMintNft;
+        $("btn-market").onclick = goMarket;
+        $("btn-tip").onclick = onTipPi;
+
+        // safety: if SDK still not ready shortly after load, show tip
+        setTimeout(() => {
+          if (!piReady) {
+            const tip = $("pi-tip");
+            if (tip) tip.style.display = "block";
+          }
+        }, 300);
+      });
+      // --- Confetti (emoji burst) ---
+      function celebrate() {
+        const emojis = ["🎉", "🎶", "🚀", "💜", "✨", "🔥"];
+        for (let i = 0; i < 25; i++) {
+          const span = document.createElement("span");
+          span.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+          span.style.position = "fixed";
+          span.style.left = Math.random() * 100 + "%";
+          span.style.top = "-20px";
+          span.style.fontSize = 16 + Math.random() * 24 + "px";
+          span.style.animation = "fall 2.5s linear forwards";
+          document.body.appendChild(span);
+          setTimeout(() => span.remove(), 2600);
+        }
+      }
+    </script>
+  </body>
 </html>
