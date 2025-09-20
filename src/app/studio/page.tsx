@@ -1,7 +1,7 @@
 // src/app/studio/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Track = {
   id: string;
@@ -9,6 +9,8 @@ type Track = {
   volume: number; // 0–100
   muted: boolean;
 };
+
+const STORAGE_KEY = "musiq-studio:tracks:v1";
 
 const initial: Track[] = [
   { id: "t1", name: "Drums", volume: 80, muted: false },
@@ -19,34 +21,97 @@ const initial: Track[] = [
 export default function StudioPage() {
   const [tracks, setTracks] = useState<Track[]>(initial);
   const [uploadName, setUploadName] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false); // avoid hydration mismatch
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load from localStorage on first mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Track[];
+        if (Array.isArray(parsed) && parsed.every(isTrack)) {
+          setTracks(parsed);
+        }
+      }
+    } catch {
+      // ignore corrupt storage
+    } finally {
+      setLoaded(true);
+    }
+  }, []);
+
+  // Debounced save to localStorage whenever tracks change (after first load)
+  useEffect(() => {
+    if (!loaded) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tracks));
+      } catch {
+        // storage could be full/blocked; ignore for now
+      }
+    }, 250);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [tracks, loaded]);
 
   const addTrack = (name: string) => {
     const id = crypto.randomUUID();
     setTracks((t) => [...t, { id, name, volume: 75, muted: false }]);
   };
 
-  const removeTrack = (id: string) => {
+  const removeTrack = (id: string) =>
     setTracks((t) => t.filter((x) => x.id !== id));
-  };
-
-  const setVolume = (id: string, volume: number) => {
+  const setVolume = (id: string, volume: number) =>
     setTracks((t) => t.map((x) => (x.id === id ? { ...x, volume } : x)));
-  };
-
-  const toggleMute = (id: string) => {
+  const toggleMute = (id: string) =>
     setTracks((t) =>
       t.map((x) => (x.id === id ? { ...x, muted: !x.muted } : x))
     );
+
+  const resetAll = () => {
+    setTracks(initial);
+    setUploadName(null);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
   };
+
+  const totalTracks = tracks.length;
+  const mutedCount = useMemo(
+    () => tracks.filter((t) => t.muted).length,
+    [tracks]
+  );
 
   return (
     <main className="max-w-5xl mx-auto px-4 py-10 space-y-10">
-      <header>
-        <h1 className="text-3xl font-bold">Studio</h1>
-        <p className="mt-2 text-gray-700">
-          Your creative workspace. Add tracks, tweak levels, and upload stems
-          (demo only).
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Studio</h1>
+          <p className="mt-2 text-gray-700">
+            Your creative workspace. Add tracks, tweak levels, and upload stems
+            (demo only).
+          </p>
+          <p className="mt-1 text-sm text-gray-500">
+            {loaded ? (
+              <>
+                {totalTracks} {totalTracks === 1 ? "track" : "tracks"}
+                {mutedCount ? ` • ${mutedCount} muted` : ""} • saved locally
+              </>
+            ) : (
+              <>Loading…</>
+            )}
+          </p>
+        </div>
+        <button
+          onClick={resetAll}
+          className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+          title="Clear local data and restore defaults"
+        >
+          Reset
+        </button>
       </header>
 
       {/* Upload / Add Track */}
@@ -71,7 +136,6 @@ export default function StudioPage() {
                 const f = e.target.files?.[0];
                 if (f) {
                   setUploadName(f.name);
-                  // Demo: just add a track with the file name (no real upload yet)
                   addTrack(f.name.replace(/\.[^/.]+$/, ""));
                 }
               }}
@@ -112,7 +176,7 @@ export default function StudioPage() {
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-600 w-14">
+                  <label className="text-sm text-gray-600 w-16">
                     Vol {tr.volume}
                   </label>
                   <input
@@ -185,5 +249,15 @@ export default function StudioPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+function isTrack(x: any): x is Track {
+  return (
+    x &&
+    typeof x.id === "string" &&
+    typeof x.name === "string" &&
+    typeof x.volume === "number" &&
+    typeof x.muted === "boolean"
   );
 }
