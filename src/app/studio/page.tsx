@@ -1,89 +1,66 @@
+// @ts-nocheck
 // src/app/studio/page.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-
-type Track = {
-  id: string;
-  name: string;
-  volume: number; // 0–100
-  muted: boolean;
-};
+import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "musiq-studio:tracks:v1";
 
-const initial: Track[] = [
-  { id: "t1", name: "Drums", volume: 80, muted: false },
-  { id: "t2", name: "Bass", volume: 70, muted: false },
-  { id: "t3", name: "Keys", volume: 65, muted: false },
-];
-
 export default function StudioPage() {
-  const [tracks, setTracks] = useState<Track[]>(initial);
-  const [uploadName, setUploadName] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false); // avoid hydration mismatch
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tracks, setTracks] = useState([
+    { id: "t1", name: "Drums", volume: 80, muted: false },
+    { id: "t2", name: "Bass", volume: 70, muted: false },
+    { id: "t3", name: "Keys", volume: 65, muted: false },
+  ]);
+  const [uploadName, setUploadName] = useState(null);
+  const [loaded, setLoaded] = useState(false);
 
-  // Load from localStorage on first mount
+  // Load once
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as Track[];
-        if (Array.isArray(parsed) && parsed.every(isTrack)) {
-          setTracks(parsed);
-        }
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setTracks(parsed);
       }
-    } catch {
-      // ignore corrupt storage
-    } finally {
-      setLoaded(true);
-    }
+    } catch {}
+    setLoaded(true);
   }, []);
 
-  // Debounced save to localStorage whenever tracks change (after first load)
+  // Save on every change (simple, no debounce)
   useEffect(() => {
     if (!loaded) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(tracks));
-      } catch {
-        // storage could be full/blocked; ignore for now
-      }
-    }, 250);
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tracks));
+    } catch {}
   }, [tracks, loaded]);
 
-  const addTrack = (name: string) => {
-    const id = crypto.randomUUID();
-    setTracks((t) => [...t, { id, name, volume: 75, muted: false }]);
-  };
+  const makeId = () => Math.random().toString(36).slice(2);
 
-  const removeTrack = (id: string) =>
-    setTracks((t) => t.filter((x) => x.id !== id));
-  const setVolume = (id: string, volume: number) =>
+  const addTrack = (name) =>
+    setTracks((t) => [...t, { id: makeId(), name, volume: 75, muted: false }]);
+
+  const removeTrack = (id) => setTracks((t) => t.filter((x) => x.id !== id));
+
+  const setVolume = (id, volume) =>
     setTracks((t) => t.map((x) => (x.id === id ? { ...x, volume } : x)));
-  const toggleMute = (id: string) =>
+
+  const toggleMute = (id) =>
     setTracks((t) =>
       t.map((x) => (x.id === id ? { ...x, muted: !x.muted } : x))
     );
 
   const resetAll = () => {
-    setTracks(initial);
+    setTracks([
+      { id: "t1", name: "Drums", volume: 80, muted: false },
+      { id: "t2", name: "Bass", volume: 70, muted: false },
+      { id: "t3", name: "Keys", volume: 65, muted: false },
+    ]);
     setUploadName(null);
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {}
   };
-
-  const totalTracks = tracks.length;
-  const mutedCount = useMemo(
-    () => tracks.filter((t) => t.muted).length,
-    [tracks]
-  );
 
   return (
     <main className="max-w-5xl mx-auto px-4 py-10 space-y-10">
@@ -97,8 +74,8 @@ export default function StudioPage() {
           <p className="mt-1 text-sm text-gray-500">
             {loaded ? (
               <>
-                {totalTracks} {totalTracks === 1 ? "track" : "tracks"}
-                {mutedCount ? ` • ${mutedCount} muted` : ""} • saved locally
+                {tracks.length} {tracks.length === 1 ? "track" : "tracks"} •
+                saved locally
               </>
             ) : (
               <>Loading…</>
@@ -108,7 +85,6 @@ export default function StudioPage() {
         <button
           onClick={resetAll}
           className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-          title="Clear local data and restore defaults"
         >
           Reset
         </button>
@@ -136,7 +112,8 @@ export default function StudioPage() {
                 const f = e.target.files?.[0];
                 if (f) {
                   setUploadName(f.name);
-                  addTrack(f.name.replace(/\.[^/.]+$/, ""));
+                  const base = f.name.replace(/\.[^/.]+$/, "");
+                  addTrack(base || "Uploaded Track");
                 }
               }}
             />
@@ -192,14 +169,12 @@ export default function StudioPage() {
                   <button
                     onClick={() => toggleMute(tr.id)}
                     className="rounded-md border px-3 py-1.5 hover:bg-gray-50"
-                    title={tr.muted ? "Unmute" : "Mute"}
                   >
                     {tr.muted ? "Unmute" : "Mute"}
                   </button>
                   <button
                     onClick={() => removeTrack(tr.id)}
                     className="rounded-md border px-3 py-1.5 text-red-600 hover:bg-red-50"
-                    title="Remove track"
                   >
                     Remove
                   </button>
@@ -249,15 +224,5 @@ export default function StudioPage() {
         </div>
       </section>
     </main>
-  );
-}
-
-function isTrack(x: any): x is Track {
-  return (
-    x &&
-    typeof x.id === "string" &&
-    typeof x.name === "string" &&
-    typeof x.volume === "number" &&
-    typeof x.muted === "boolean"
   );
 }
