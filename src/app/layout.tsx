@@ -1,11 +1,16 @@
 // src/app/layout.tsx
-import type { Metadata } from "next";
 import "./globals.css";
-import Header from "./Header";
+import type { Metadata } from "next";
+import Header from "./Header"; // client component is fine inside a server layout
 
 export const metadata: Metadata = {
   title: "Musiq-Studio",
-  description: "Create, share, and explore music on the web.",
+  description: "Web3 music creation & NFT minting for the Pi Network",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -15,9 +20,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-white text-gray-900 antialiased">
+      <body className="min-h-screen bg-white text-slate-900 antialiased">
         <Header />
-        <main className="max-w-4xl mx-auto px-4 py-8">{children}</main>
+        <main>{children}</main>
       </body>
     </html>
   );
