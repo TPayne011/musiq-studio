@@ -1,66 +1,107 @@
-// @ts-nocheck
 // src/app/studio/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+type Track = {
+  id: string;
+  name: string;
+  volume: number; // 0–100
+  muted: boolean;
+};
 
 const STORAGE_KEY = "musiq-studio:tracks:v1";
 
-export default function StudioPage() {
-  const [tracks, setTracks] = useState([
-    { id: "t1", name: "Drums", volume: 80, muted: false },
-    { id: "t2", name: "Bass", volume: 70, muted: false },
-    { id: "t3", name: "Keys", volume: 65, muted: false },
-  ]);
-  const [uploadName, setUploadName] = useState(null);
-  const [loaded, setLoaded] = useState(false);
+const initialTracks: Track[] = [
+  { id: "t1", name: "Drums", volume: 80, muted: false },
+  { id: "t2", name: "Bass", volume: 70, muted: false },
+  { id: "t3", name: "Keys", volume: 65, muted: false },
+];
 
-  // Load once
+// Simple ID generator (avoid crypto type hassles)
+function makeId(): string {
+  return Math.random().toString(36).slice(2);
+}
+
+export default function StudioPage() {
+  const [tracks, setTracks] = useState<Track[]>(initialTracks);
+  const [uploadName, setUploadName] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<boolean>(false);
+
+  // useRef for debounce timer (number from window.setTimeout in browsers)
+  const saveTimer = useRef<number | null>(null);
+
+  // --- Load from localStorage once on mount
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setTracks(parsed);
+        const parsed = JSON.parse(raw) as unknown;
+        if (Array.isArray(parsed) && parsed.every(isTrack)) {
+          setTracks(parsed);
+        }
       }
-    } catch {}
-    setLoaded(true);
+    } catch {
+      // ignore corrupted storage
+    } finally {
+      setLoaded(true);
+    }
   }, []);
 
-  // Save on every change (simple, no debounce)
+  // --- Debounced save to localStorage (clean types, no ts-ignore)
   useEffect(() => {
     if (!loaded) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tracks));
-    } catch {}
+
+    if (saveTimer.current !== null) {
+      window.clearTimeout(saveTimer.current);
+    }
+
+    const t = window.setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tracks));
+      } catch {
+        // storage may be blocked/full
+      }
+    }, 250);
+
+    saveTimer.current = t;
+
+    return () => {
+      window.clearTimeout(t);
+    };
   }, [tracks, loaded]);
 
-  const makeId = () => Math.random().toString(36).slice(2);
+  // --- Actions
+  const addTrack = (name: string) =>
+    setTracks((prev) => [
+      ...prev,
+      { id: makeId(), name, volume: 75, muted: false },
+    ]);
 
-  const addTrack = (name) =>
-    setTracks((t) => [...t, { id: makeId(), name, volume: 75, muted: false }]);
+  const removeTrack = (id: string) =>
+    setTracks((prev) => prev.filter((x) => x.id !== id));
 
-  const removeTrack = (id) => setTracks((t) => t.filter((x) => x.id !== id));
+  const setVolume = (id: string, volume: number) =>
+    setTracks((prev) => prev.map((x) => (x.id === id ? { ...x, volume } : x)));
 
-  const setVolume = (id, volume) =>
-    setTracks((t) => t.map((x) => (x.id === id ? { ...x, volume } : x)));
-
-  const toggleMute = (id) =>
-    setTracks((t) =>
-      t.map((x) => (x.id === id ? { ...x, muted: !x.muted } : x))
+  const toggleMute = (id: string) =>
+    setTracks((prev) =>
+      prev.map((x) => (x.id === id ? { ...x, muted: !x.muted } : x))
     );
 
   const resetAll = () => {
-    setTracks([
-      { id: "t1", name: "Drums", volume: 80, muted: false },
-      { id: "t2", name: "Bass", volume: 70, muted: false },
-      { id: "t3", name: "Keys", volume: 65, muted: false },
-    ]);
+    setTracks(initialTracks);
     setUploadName(null);
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {}
   };
+
+  const totalTracks = tracks.length;
+  const mutedCount = useMemo(
+    () => tracks.filter((t) => t.muted).length,
+    [tracks]
+  );
 
   return (
     <main className="max-w-5xl mx-auto px-4 py-10 space-y-10">
@@ -74,8 +115,8 @@ export default function StudioPage() {
           <p className="mt-1 text-sm text-gray-500">
             {loaded ? (
               <>
-                {tracks.length} {tracks.length === 1 ? "track" : "tracks"} •
-                saved locally
+                {totalTracks} {totalTracks === 1 ? "track" : "tracks"}
+                {mutedCount ? ` • ${mutedCount} muted` : ""} • saved locally
               </>
             ) : (
               <>Loading…</>
@@ -85,6 +126,7 @@ export default function StudioPage() {
         <button
           onClick={resetAll}
           className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+          title="Clear local data and restore defaults"
         >
           Reset
         </button>
@@ -109,7 +151,7 @@ export default function StudioPage() {
               accept="audio/*"
               className="hidden"
               onChange={(e) => {
-                const f = e.target.files?.[0];
+                const f = e.currentTarget.files?.[0];
                 if (f) {
                   setUploadName(f.name);
                   const base = f.name.replace(/\.[^/.]+$/, "");
@@ -191,38 +233,17 @@ export default function StudioPage() {
           )}
         </div>
       </section>
-
-      {/* Mixer Placeholder */}
-      <section className="rounded-lg border p-4">
-        <h2 className="text-lg font-semibold mb-3">Mixer (Placeholder)</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          Basic per-track volume & mute controls are active above. A fuller
-          mixer (panning, EQ, sends) will land here later.
-        </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-          {tracks.map((tr) => (
-            <div key={`m-${tr.id}`} className="rounded-md border p-3">
-              <div className="truncate text-sm font-medium">{tr.name}</div>
-              <div className="mt-2 text-xs text-gray-500">Vol {tr.volume}</div>
-              <div className="mt-3">
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={tr.volume}
-                  onChange={(e) => setVolume(tr.id, Number(e.target.value))}
-                />
-              </div>
-              <button
-                onClick={() => toggleMute(tr.id)}
-                className="mt-3 w-full rounded-md border px-2 py-1.5 text-xs hover:bg-gray-50"
-              >
-                {tr.muted ? "Unmute" : "Mute"}
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
     </main>
+  );
+}
+
+function isTrack(x: unknown): x is Track {
+  if (!x || typeof x !== "object") return false;
+  const o = x as Record<string, unknown>;
+  return (
+    typeof o.id === "string" &&
+    typeof o.name === "string" &&
+    typeof o.volume === "number" &&
+    typeof o.muted === "boolean"
   );
 }

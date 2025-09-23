@@ -1,19 +1,37 @@
-# dependencies
+﻿# dependencies
 node_modules/
+.pnp.*
+.pnpm-*
 
-# builds
+# next build output
 .next/
 out/
 
+# typescript
+*.tsbuildinfo
+
 # logs
 npm-debug.log*
-pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+*.log
 
-# env
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# testing
+coverage/
+
+# editor / IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# netlify build cache
+.netlify/
+netlify/*.log
+
+# misc
+*.swp
+*.swo
