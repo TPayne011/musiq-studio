@@ -2,7 +2,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import Header from "./Header";
-import Footer from "./Footer";
+import SiteFooter from "./Footer";
 
 export const metadata: Metadata = {
   title: "Musiq-Studio",
@@ -24,7 +24,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col bg-white text-slate-900 antialiased">
         <Header />
         <main className="flex-grow">{children}</main>
-        <Footer />
+        <SiteFooter />
       </body>
     </html>
   );
