@@ -1,7 +1,8 @@
 // src/app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
-import Header from "./Header"; // client component is fine inside a server layout
+import Header from "./Header";
+import Footer from "./Footer";
 
 export const metadata: Metadata = {
   title: "Musiq-Studio",
@@ -20,9 +21,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-white text-slate-900 antialiased">
+      <body className="min-h-screen flex flex-col bg-white text-slate-900 antialiased">
         <Header />
-        <main>{children}</main>
+        <main className="flex-grow">{children}</main>
+        <Footer />
       </body>
     </html>
   );
