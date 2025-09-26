@@ -1,249 +1,140 @@
-// src/app/studio/page.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useLocalStorage } from "@/lib/useLocalStorage";
 
-type Track = {
-  id: string;
-  name: string;
-  volume: number; // 0–100
+// Mixer state type
+type MixerState = {
+  src: string; // audio source url
+  volume: number; // 0..1
+  pan: number; // -1..1
   muted: boolean;
+  loop: boolean;
 };
 
-const STORAGE_KEY = "musiq-studio:tracks:v1";
-
-const initialTracks: Track[] = [
-  { id: "t1", name: "Drums", volume: 80, muted: false },
-  { id: "t2", name: "Bass", volume: 70, muted: false },
-  { id: "t3", name: "Keys", volume: 65, muted: false },
-];
-
-// Simple ID generator (avoid crypto type hassles)
-function makeId(): string {
-  return Math.random().toString(36).slice(2);
-}
+const DEFAULT_STATE: MixerState = {
+  src: "/audio/Rev.mp3", // your daughter's beat as default
+  volume: 0.8,
+  pan: 0,
+  muted: false,
+  loop: true,
+};
 
 export default function StudioPage() {
-  const [tracks, setTracks] = useState<Track[]>(initialTracks);
-  const [uploadName, setUploadName] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState<boolean>(false);
-
-  // useRef for debounce timer (number from window.setTimeout in browsers)
-  const saveTimer = useRef<number | null>(null);
-
-  // --- Load from localStorage once on mount
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as unknown;
-        if (Array.isArray(parsed) && parsed.every(isTrack)) {
-          setTracks(parsed);
-        }
-      }
-    } catch {
-      // ignore corrupted storage
-    } finally {
-      setLoaded(true);
-    }
-  }, []);
-
-  // --- Debounced save to localStorage (clean types, no ts-ignore)
-  useEffect(() => {
-    if (!loaded) return;
-
-    if (saveTimer.current !== null) {
-      window.clearTimeout(saveTimer.current);
-    }
-
-    const t = window.setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(tracks));
-      } catch {
-        // storage may be blocked/full
-      }
-    }, 250);
-
-    saveTimer.current = t;
-
-    return () => {
-      window.clearTimeout(t);
-    };
-  }, [tracks, loaded]);
-
-  // --- Actions
-  const addTrack = (name: string) =>
-    setTracks((prev) => [
-      ...prev,
-      { id: makeId(), name, volume: 75, muted: false },
-    ]);
-
-  const removeTrack = (id: string) =>
-    setTracks((prev) => prev.filter((x) => x.id !== id));
-
-  const setVolume = (id: string, volume: number) =>
-    setTracks((prev) => prev.map((x) => (x.id === id ? { ...x, volume } : x)));
-
-  const toggleMute = (id: string) =>
-    setTracks((prev) =>
-      prev.map((x) => (x.id === id ? { ...x, muted: !x.muted } : x))
-    );
-
-  const resetAll = () => {
-    setTracks(initialTracks);
-    setUploadName(null);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {}
-  };
-
-  const totalTracks = tracks.length;
-  const mutedCount = useMemo(
-    () => tracks.filter((t) => t.muted).length,
-    [tracks]
+  const [state, setState] = useLocalStorage<MixerState>(
+    "musiq.mixer.v1",
+    DEFAULT_STATE
   );
 
-  return (
-    <main className="max-w-5xl mx-auto px-4 py-10 space-y-10">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Studio</h1>
-          <p className="mt-2 text-gray-700">
-            Your creative workspace. Add tracks, tweak levels, and upload stems
-            (demo only).
-          </p>
-          <p className="mt-1 text-sm text-gray-500">
-            {loaded ? (
-              <>
-                {totalTracks} {totalTracks === 1 ? "track" : "tracks"}
-                {mutedCount ? ` • ${mutedCount} muted` : ""} • saved locally
-              </>
-            ) : (
-              <>Loading…</>
-            )}
-          </p>
-        </div>
-        <button
-          onClick={resetAll}
-          className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-          title="Clear local data and restore defaults"
-        >
-          Reset
-        </button>
-      </header>
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-      {/* Upload / Add Track */}
-      <section className="rounded-lg border p-4">
-        <h2 className="text-lg font-semibold mb-3">Add Track</h2>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+  // Update audio element when state changes
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.src = state.src;
+    audio.loop = state.loop;
+    audio.muted = state.muted;
+    audio.volume = state.muted ? 0 : state.volume;
+  }, [state]);
+
+  return (
+    <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+      <h1 className="text-2xl font-bold">Studio</h1>
+
+      <section className="rounded-lg border p-4 space-y-4">
+        {/* Controls */}
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => addTrack("New Track")}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
+            className="rounded border px-3 py-1 hover:bg-gray-50"
+            onClick={() => audioRef.current?.play()}
           >
-            + Quick Track
+            ▶ Play
+          </button>
+          <button
+            className="rounded border px-3 py-1 hover:bg-gray-50"
+            onClick={() => audioRef.current?.pause()}
+          >
+            ⏸ Pause
           </button>
 
-          <div className="text-sm text-gray-600">or upload a file:</div>
-
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 hover:bg-gray-50">
+          <label className="ml-4 inline-flex items-center gap-2">
             <input
-              type="file"
-              accept="audio/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.currentTarget.files?.[0];
-                if (f) {
-                  setUploadName(f.name);
-                  const base = f.name.replace(/\.[^/.]+$/, "");
-                  addTrack(base || "Uploaded Track");
-                }
-              }}
+              type="checkbox"
+              checked={state.loop}
+              onChange={(e) => setState({ ...state, loop: e.target.checked })}
             />
-            <span>Choose audio…</span>
+            Loop
           </label>
 
-          {uploadName && (
-            <span className="text-sm text-gray-600">
-              Selected: {uploadName}
-            </span>
-          )}
+          <label className="ml-4 inline-flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={state.muted}
+              onChange={(e) => setState({ ...state, muted: e.target.checked })}
+            />
+            Mute
+          </label>
         </div>
+
+        {/* Volume + Pan */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium">
+              Volume: {Math.round(state.volume * 100)}%
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={state.volume}
+              onChange={(e) =>
+                setState({ ...state, volume: Number(e.target.value) })
+              }
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">
+              Pan: {state.pan}
+            </label>
+            <input
+              type="range"
+              min={-1}
+              max={1}
+              step={0.01}
+              value={state.pan}
+              onChange={(e) =>
+                setState({ ...state, pan: Number(e.target.value) })
+              }
+              className="w-full"
+            />
+          </div>
+        </div>
+
+        {/* Track picker */}
+        <div className="flex items-center gap-3">
+          <select
+            className="rounded border px-2 py-1"
+            value={state.src}
+            onChange={(e) => setState({ ...state, src: e.target.value })}
+          >
+            <option value="/audio/Rev.mp3">Rev Beat (public)</option>
+            {/* Drop more into /public/audio and add here */}
+          </select>
+        </div>
+
+        {/* Hidden audio element */}
+        <audio ref={audioRef} preload="auto" />
       </section>
 
-      {/* Track List */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Tracks</h2>
-          <span className="text-sm text-gray-600">{tracks.length} total</span>
-        </div>
-
-        <div className="divide-y rounded-lg border">
-          {tracks.map((tr) => (
-            <div
-              key={tr.id}
-              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <div className="truncate text-base font-medium">
-                  {tr.muted ? "🔇 " : ""}
-                  {tr.name}
-                </div>
-                <div className="text-xs text-gray-500">
-                  ID: {tr.id.slice(0, 8)}…
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-600 w-16">
-                    Vol {tr.volume}
-                  </label>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={tr.volume}
-                    onChange={(e) => setVolume(tr.id, Number(e.target.value))}
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => toggleMute(tr.id)}
-                    className="rounded-md border px-3 py-1.5 hover:bg-gray-50"
-                  >
-                    {tr.muted ? "Unmute" : "Mute"}
-                  </button>
-                  <button
-                    onClick={() => removeTrack(tr.id)}
-                    className="rounded-md border px-3 py-1.5 text-red-600 hover:bg-red-50"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {tracks.length === 0 && (
-            <div className="p-6 text-center text-sm text-gray-600">
-              No tracks yet. Use <strong>+ Quick Track</strong> or choose an
-              audio file to add one.
-            </div>
-          )}
-        </div>
-      </section>
+      <p className="text-sm text-gray-500">
+        Settings (volume/pan/mute/loop and last track) are saved automatically
+        in your browser and restored on reload.
+      </p>
     </main>
-  );
-}
-
-function isTrack(x: unknown): x is Track {
-  if (!x || typeof x !== "object") return false;
-  const o = x as Record<string, unknown>;
-  return (
-    typeof o.id === "string" &&
-    typeof o.name === "string" &&
-    typeof o.volume === "number" &&
-    typeof o.muted === "boolean"
   );
 }
