@@ -2,22 +2,23 @@
 export default function HomePage() {
   return (
     <main className="max-w-4xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold">Musiq-Studio</h1>
-      <p className="mt-3 text-lg">
-        Welcome! Use the nav above to visit the Studio, Market, Privacy, and
-        Terms pages.
+      <h1 className="text-4xl font-bold text-center">Musiq-Studio</h1>
+      <p className="mt-4 text-lg text-center text-gray-700">
+        Welcome! Use the navigation above to explore the Studio, Market,
+        Privacy, and Terms pages.
       </p>
 
-      <section className="mt-8 space-y-3">
-        <h2 className="text-xl font-semibold">What’s next</h2>
+      <section className="mt-10 space-y-3">
+        <h2 className="text-2xl font-semibold">What’s Next</h2>
         <ul className="list-disc pl-6 space-y-1">
           <li>
-            Build the <strong>Studio</strong> workspace.
+            Build out the <strong>Studio</strong> workspace for creating music.
           </li>
           <li>
-            Set up the <strong>Market</strong> page.
+            Expand the <strong>Market</strong> for sharing and minting tracks as
+            NFTs.
           </li>
-          <li>Add a custom favicon & metadata.</li>
+          <li>Add custom branding (logo, favicon, metadata).</li>
         </ul>
       </section>
     </main>
