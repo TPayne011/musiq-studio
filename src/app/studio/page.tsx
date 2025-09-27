@@ -1,44 +1,114 @@
-// src/app/studio/page.tsx
 "use client";
 
-import { useState } from "react";
-import { useLocalStorage } from "@/lib/useLocalStorage";
+import { useRef, useState, useEffect } from "react";
 
 export default function StudioPage() {
-  // Persist volume slider with localStorage
-  const [volume, setVolume] = useLocalStorage("studio-volume", 50);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [src, setSrc] = useState<string>("/audio/Rev.mp3"); // default preset
+  const [volume, setVolume] = useState<number>(80);
+  const [error, setError] = useState<string | null>(null);
 
-  const togglePlay = () => setIsPlaying((prev) => !prev);
+  // Keep element volume synced
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume / 100;
+  }, [volume]);
+
+  // File picker
+  function onPickLocal(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    setSrc(url);
+    setError(null);
+    queueMicrotask(() => audioRef.current?.play().catch(() => {}));
+  }
+
+  function onPlay() {
+    setError(null);
+    audioRef.current?.play().catch(() => {
+      setError("Autoplay blocked—press Play again.");
+    });
+  }
+
+  function onPause() {
+    audioRef.current?.pause();
+  }
 
   return (
-    <main className="max-w-4xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold mb-6">Studio</h1>
-      <h2 className="text-2xl text-blue-600 mt-4">Tailwind is working</h2>
+    <main className="mx-auto max-w-4xl px-4 py-10 space-y-6">
+      <h1 className="text-2xl font-bold">Studio</h1>
 
-      <section className="space-y-6">
-        {/* Audio Controls */}
-        <div className="flex items-center gap-4">
+      <div className="rounded-lg border p-4 space-y-4">
+        {/* Transport */}
+        <div className="flex items-center gap-3">
           <button
-            onClick={togglePlay}
-            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+            onClick={onPlay}
+            className="rounded border px-3 py-1 hover:bg-gray-50"
           >
-            {isPlaying ? "Pause" : "Play"}
+            ▶ Play
           </button>
+          <button
+            onClick={onPause}
+            className="rounded border px-3 py-1 hover:bg-gray-50"
+          >
+            ⏸ Pause
+          </button>
+
+          <label className="ml-4 rounded border px-2 py-1 cursor-pointer hover:bg-gray-50">
+            Choose file…
+            <input
+              type="file"
+              accept="audio/*"
+              className="hidden"
+              onChange={onPickLocal}
+            />
+          </label>
+        </div>
+
+        {/* Preset selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm">Preset:</span>
+          <select
+            className="rounded border px-2 py-1"
+            value={src}
+            onChange={(e) => setSrc(e.target.value)}
+          >
+            <option value="/audio/Rev.mp3">Rev Beat (public)</option>
+          </select>
+        </div>
+
+        {/* Volume */}
+        <div>
+          <label className="block text-sm font-medium">
+            Volume: {Math.round(volume)}%
+          </label>
           <input
             type="range"
             min={0}
             max={100}
             value={volume}
             onChange={(e) => setVolume(Number(e.target.value))}
-            className="w-64"
+            className="w-full"
           />
-          <span>{volume}%</span>
         </div>
 
-        {/* Sample Beat */}
-        <audio src="/audio/Rev.mp3" controls style={{ width: "100%" }} />
-      </section>
+        {/* Player */}
+        <audio
+          ref={audioRef}
+          src={src}
+          controls
+          preload="auto"
+          onError={() => setError("Couldn’t load this audio source.")}
+          className="w-full"
+        />
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        <p className="text-xs text-gray-500">
+          Local files selected here don’t persist after refresh. For presets,
+          drop files into <code>/public/audio</code>.
+        </p>
+      </div>
     </main>
   );
 }
