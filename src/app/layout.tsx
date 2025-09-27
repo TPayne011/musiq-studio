@@ -1,8 +1,7 @@
-// src/app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
 import Header from "./Header";
-import SiteFooter from "./Footer";
+import Footer from "./Footer";
 
 export const metadata: Metadata = {
   title: "Musiq-Studio",
@@ -11,8 +10,8 @@ export const metadata: Metadata = {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
     apple: "/apple-touch-icon.png",
+    manifest: "/manifest.webmanifest",
   },
-  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({
@@ -22,10 +21,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen flex flex-col bg-white text-slate-900 antialiased">
+      <body className="flex min-h-screen flex-col">
         <Header />
         <main className="flex-grow">{children}</main>
-        <SiteFooter />
+        <Footer />
       </body>
     </html>
   );

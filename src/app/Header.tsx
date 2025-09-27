@@ -1,23 +1,17 @@
-// src/app/Header.tsx
-"use client";
-
-import Link from "next/link";
-import Image from "next/image";
-
 export default function Header() {
   return (
-    <header className="flex items-center justify-between px-6 py-4 border-b">
-      <div className="flex items-center gap-3">
-        <Image src="/logo.png" alt="Musiq-Studio Logo" width={32} height={32} />
-        <span className="font-bold text-lg">Musiq-Studio</span>
+    <header className="border-b bg-white">
+      <div className="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
+        <a href="/" className="font-semibold">
+          Musiq-Studio
+        </a>
+        <nav className="flex gap-4 text-sm">
+          <a href="/studio">Studio</a>
+          <a href="/market">Market</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+        </nav>
       </div>
-      <nav className="flex gap-6 text-sm font-medium">
-        <Link href="/">Home</Link>
-        <Link href="/studio">Studio</Link>
-        <Link href="/market">Market</Link>
-        <Link href="/privacy">Privacy</Link>
-        <Link href="/terms">Terms</Link>
-      </nav>
     </header>
   );
 }
