@@ -10,6 +10,7 @@ export default function Header() {
         </Link>
         <nav className="flex gap-4 text-sm">
           <Link href="/studio">Studio</Link>
+          <Link href="/studio/pro">Pro</Link>
           <Link href="/market">Market</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
@@ -17,4 +18,10 @@ export default function Header() {
       </div>
     </header>
   );
+}
+{
+  /* optional: quick link to Pro */
+}
+{
+  /* <Link href="/studio/pro">Studio Pro</Link> */
 }
