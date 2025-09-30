@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-// Use relative path (pro is 2 levels deeper than components)
 import Visualizer from "../../components/Visualizer";
 
 type TrackState = {
@@ -9,6 +8,7 @@ type TrackState = {
   name: string;
   src: string | null; // preset URL or blob URL
   volume: number; // 0..100
+  pan: number; // -100 (left) .. 100 (right)
   el: HTMLAudioElement | null; // created once, reused
 };
 
@@ -17,28 +17,37 @@ export default function StudioProPage() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
 
-  // Keep node refs per track id
+  // node refs keyed by track id
   const sourceNodes = useRef<Map<number, MediaElementAudioSourceNode>>(
     new Map()
   );
   const trackGains = useRef<Map<number, GainNode>>(new Map());
+  const trackPans = useRef<Map<number, StereoPannerNode>>(new Map()); // NEW
 
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stereoSupported, setStereoSupported] = useState(true);
 
-  // Two tracks to start. Track 1 uses your Rev.mp3 preset, Track 2 starts empty.
   const [tracks, setTracks] = useState<TrackState[]>([
-    { id: 1, name: "Track 1", src: "/audio/Rev.mp3", volume: 80, el: null },
-    { id: 2, name: "Track 2", src: null, volume: 80, el: null },
+    {
+      id: 1,
+      name: "Track 1",
+      src: "/audio/Rev.mp3",
+      volume: 80,
+      pan: 0,
+      el: null,
+    },
+    { id: 2, name: "Track 2", src: null, volume: 80, pan: 0, el: null },
   ]);
 
-  // Initialize AudioContext graph once
   useEffect(() => {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     const ctx = new AudioCtx();
     ctxRef.current = ctx;
 
-    // Master analyser + gain
+    const canStereo = typeof (ctx as any).createStereoPanner === "function";
+    setStereoSupported(canStereo);
+
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 1024;
     analyserRef.current = analyser;
@@ -47,11 +56,10 @@ export default function StudioProPage() {
     masterGain.gain.value = 1;
     masterGainRef.current = masterGain;
 
-    // route: individual track gains -> masterGain -> analyser -> destination
+    // route: per-track -> masterGain -> analyser -> destination
     masterGain.connect(analyser);
     analyser.connect(ctx.destination);
 
-    // Build audio elements + nodes for each track
     const updated = tracks.map((t) => {
       const el = new Audio();
       el.loop = true;
@@ -65,17 +73,33 @@ export default function StudioProPage() {
       gain.gain.value = t.volume / 100;
       trackGains.current.set(t.id, gain);
 
-      // connect: src -> trackGain -> masterGain
-      srcNode.connect(gain);
-      gain.connect(masterGain);
+      // NEW: stereo panner (if supported)
+      let panNode: StereoPannerNode | null = null;
+      if (canStereo) {
+        panNode = (ctx as any).createStereoPanner() as StereoPannerNode;
+        panNode.pan.value = t.pan / 100; // scale -100..100 -> -1..1
+        trackPans.current.set(t.id, panNode);
+      }
+
+      // Connect chain:
+      // src -> gain -> (pan?) -> master
+      if (panNode) {
+        srcNode.connect(gain);
+        gain.connect(panNode);
+        panNode.connect(masterGain);
+      } else {
+        // fallback: no pan support
+        srcNode.connect(gain);
+        gain.connect(masterGain);
+      }
 
       return { ...t, el };
     });
+
     setTracks(updated);
     setReady(true);
 
     return () => {
-      // cleanup
       try {
         updated.forEach((t) => {
           try {
@@ -86,32 +110,25 @@ export default function StudioProPage() {
       } catch {}
       sourceNodes.current.clear();
       trackGains.current.clear();
+      trackPans.current.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // run once
+  }, []); // once
 
-  // Helpers
   const playAll = async () => {
     setError(null);
     try {
       await Promise.all(
         tracks.map(async (t) => {
-          if (t.el) {
-            // ensure a src exists
-            if (!t.el.src) return;
-            await t.el.play();
-          }
+          if (t.el && t.el.src) await t.el.play();
         })
       );
-    } catch (e) {
+    } catch {
       setError("Autoplay blocked — click Play again after interacting.");
     }
   };
 
-  const pauseAll = () => {
-    tracks.forEach((t) => t.el?.pause());
-  };
-
+  const pauseAll = () => tracks.forEach((t) => t.el?.pause());
   const stopAll = () => {
     tracks.forEach((t) => {
       if (t.el) {
@@ -131,7 +148,6 @@ export default function StudioProPage() {
         if (t.id !== trackId) return t;
         if (t.el) {
           t.el.src = url;
-          // try to start playing when chosen
           t.el.play().catch(() => {});
         }
         return { ...t, src: url };
@@ -143,9 +159,7 @@ export default function StudioProPage() {
     setTracks((prev) =>
       prev.map((t) => {
         if (t.id !== trackId) return t;
-        // update element volume
         if (t.el) t.el.volume = v / 100;
-        // update gain node volume (so analyser visualizes correct loudness)
         trackGains.current
           .get(trackId)
           ?.gain.setValueAtTime(v / 100, ctxRef.current!.currentTime);
@@ -154,11 +168,24 @@ export default function StudioProPage() {
     );
   };
 
+  // NEW: pan handler
+  const onPanChange = (trackId: number, v: number) => {
+    setTracks((prev) =>
+      prev.map((t) => {
+        if (t.id !== trackId) return t;
+        const node = trackPans.current.get(trackId);
+        if (node) node.pan.setValueAtTime(v / 100, ctxRef.current!.currentTime); // -1..1
+        return { ...t, pan: v };
+      })
+    );
+  };
+
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 space-y-6">
       <h1 className="text-3xl font-bold">Studio Pro</h1>
       <p className="text-gray-600">
-        Two-track mini-mixer with per-track volume and a live visualizer.
+        Two-track mixer with per-track volume{stereoSupported ? " & pan" : ""}{" "}
+        and a live visualizer.
       </p>
 
       <div className="rounded border bg-white p-4 space-y-4">
@@ -191,6 +218,7 @@ export default function StudioProPage() {
             <div key={t.id} className="rounded border p-3 space-y-3">
               <div className="font-medium">{t.name}</div>
 
+              {/* Volume */}
               <div className="flex items-center gap-2">
                 <label className="text-sm w-16">Volume</label>
                 <input
@@ -204,6 +232,31 @@ export default function StudioProPage() {
                 <span className="text-sm w-10 text-right">{t.volume}%</span>
               </div>
 
+              {/* Pan (if supported) */}
+              {stereoSupported && (
+                <div className="flex items-center gap-2">
+                  <label className="text-sm w-16">Pan</label>
+                  <input
+                    type="range"
+                    min={-100}
+                    max={100}
+                    step={1}
+                    value={t.pan}
+                    onChange={(e) => onPanChange(t.id, Number(e.target.value))}
+                    className="flex-1"
+                    aria-label="Stereo pan"
+                  />
+                  <span className="text-sm w-16 text-right">
+                    {t.pan < 0
+                      ? `L ${Math.abs(t.pan)}`
+                      : t.pan > 0
+                      ? `R ${t.pan}`
+                      : "C"}
+                  </span>
+                </div>
+              )}
+
+              {/* Source select + local file */}
               <div className="flex items-center gap-2">
                 <label className="text-sm w-16">Source</label>
                 <select
