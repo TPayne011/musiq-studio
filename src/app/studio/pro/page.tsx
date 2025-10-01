@@ -66,8 +66,10 @@ export default function StudioProPage() {
   );
 
   // Persisted master volume (0..100)
-  const [masterVol, setMasterVol] = useLocalStorage<number>(MASTER_KEY, 100);
-
+  const [masterVol, setMasterVolume] = useLocalStorage<number>(
+    "musiqProMasterV1",
+    100
+  );
   const [ready, setReady] = useState(false);
   const [stereoSupported, setStereoSupported] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +90,9 @@ export default function StudioProPage() {
     const master = ctx.createGain();
     master.gain.value = masterVol / 100;
     masterGainRef.current = master;
+    // when you create the master gain the first time
+    masterGainRef.current = ctx.createGain();
+    masterGainRef.current.gain.value = masterVol / 100;
 
     // master -> analyser -> destination
     master.connect(analyser);
@@ -151,6 +156,7 @@ export default function StudioProPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ---- Apply master volume changes
   // ---- Apply master volume changes
   useEffect(() => {
     if (masterGainRef.current)
