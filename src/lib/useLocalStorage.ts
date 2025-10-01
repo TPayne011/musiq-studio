@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 
-// Persist state to localStorage
 export function useLocalStorage<T>(key: string, initialValue: T) {
   const [value, setValue] = useState<T>(() => {
-    if (typeof window === "undefined") return initialValue;
     try {
       const stored = window.localStorage.getItem(key);
       return stored ? (JSON.parse(stored) as T) : initialValue;
-    } catch {
+    } catch (err) {
+      console.error("useLocalStorage error", err);
       return initialValue;
     }
   });
@@ -15,8 +14,8 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
   useEffect(() => {
     try {
       window.localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      // ignore write errors
+    } catch (err) {
+      console.error("useLocalStorage write error", err);
     }
   }, [key, value]);
 
