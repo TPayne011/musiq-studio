@@ -66,7 +66,7 @@ export default function StudioProPage() {
   );
 
   // Persisted master volume (0..100)
-  const [masterVol, setMasterVolume] = useLocalStorage<number>(
+  const [masterVol, setMasterVol] = useLocalStorage<number>(
     "musiqProMasterV1",
     100
   );
@@ -337,7 +337,6 @@ export default function StudioProPage() {
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 space-y-6">
       <h1 className="text-3xl font-bold">Studio Pro — 2 Tracks</h1>
-
       {/* Transport + Master */}
       <div className="rounded border bg-white p-3 flex flex-wrap items-center gap-3">
         <button
@@ -372,7 +371,6 @@ export default function StudioProPage() {
           <span className="text-sm w-10 text-right">{masterVol}%</span>
         </div>
       </div>
-
       {/* Two tracks side-by-side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {tracks.map((t) => (
@@ -446,8 +444,10 @@ export default function StudioProPage() {
           </div>
         ))}
       </div>
-
       {/* Waveform visualizer */}
+      import EffectsRack from "../../components/EffectsRack"; // ... inside your
+      JSX return:
+      <EffectsRack />
       <div className="rounded border bg-white p-3">
         <div className="text-sm mb-2 text-gray-600">Waveform</div>
         <canvas
@@ -457,7 +457,6 @@ export default function StudioProPage() {
           className="w-full h-32"
         />
       </div>
-
       {error && (
         <div className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-700">
           {error}
