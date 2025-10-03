@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 // If you don't have the @ alias in tsconfig, change to: ../../../lib/useLocalStorage
 import { useLocalStorage } from "@/lib/useLocalStorage";
+import EffectsRack from "@/app/components/EffectsRack";
 
 type Track = {
   id: number;
@@ -51,6 +52,8 @@ export default function StudioProPage() {
   const ctxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const wetGainRef = useRef<GainNode | null>(null);
+  const dryGainRef = useRef<GainNode | null>(null);
 
   const sourceNodes = useRef<Map<number, MediaElementAudioSourceNode>>(
     new Map()
@@ -58,6 +61,12 @@ export default function StudioProPage() {
   const trackGains = useRef<Map<number, GainNode>>(new Map());
   const trackPans = useRef<Map<number, StereoPannerNode>>(new Map());
   const blobUrls = useRef<Map<number, string>>(new Map());
+  // Effect nodes (master FX chain)
+  const convolverRef = useRef<ConvolverNode | null>(null); // Reverb
+  const delayRef = useRef<DelayNode | null>(null); // Delay
+  const feedbackRef = useRef<GainNode | null>(null); // Delay feedback
+  const lowShelfRef = useRef<BiquadFilterNode | null>(null); // EQ (bass)
+  const compRef = useRef<DynamicsCompressorNode | null>(null); // Compression
 
   // ---- State
   const saved = typeof window !== "undefined" ? loadSavedTracks() : null;
@@ -90,6 +99,49 @@ export default function StudioProPage() {
     const master = ctx.createGain();
     master.gain.value = masterVol / 100;
     masterGainRef.current = master;
+    // ----- FX nodes -----
+    convolverRef.current = ctx.createConvolver();
+    // quick tiny impulse for "room" reverb
+    {
+      const len = 2048;
+      const impulse = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const data = impulse.getChannelData(ch);
+        for (let i = 0; i < len; i++)
+          data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      }
+      convolverRef.current.buffer = impulse;
+    }
+
+    delayRef.current = ctx.createDelay(1.0); // max 1s
+    feedbackRef.current = ctx.createGain();
+    feedbackRef.current.gain.value = 0.2; // subtle default
+    delayRef.current.connect(feedbackRef.current);
+    feedbackRef.current.connect(delayRef.current); // feedback loop
+
+    lowShelfRef.current = ctx.createBiquadFilter();
+    lowShelfRef.current.type = "lowshelf";
+    lowShelfRef.current.frequency.value = 200; // bass shelf point
+    lowShelfRef.current.gain.value = 0;
+
+    compRef.current = ctx.createDynamicsCompressor();
+    compRef.current.threshold.value = -24;
+    compRef.current.knee.value = 30;
+    compRef.current.ratio.value = 3;
+    compRef.current.attack.value = 0.003;
+    compRef.current.release.value = 0.25;
+
+    // ----- Master routing: masterGain -> EQ -> Delay -> Reverb -> Compressor -> Analyser -> Destination
+    masterGainRef.current
+      .connect(lowShelfRef.current)
+      .connect(delayRef.current)
+      .connect(convolverRef.current)
+      .connect(compRef.current)
+      .connect(analyserRef.current!);
+
+    delayRef.current.connect(compRef.current); // dry+wet mix via parallel: we’ll add dry below
+    lowShelfRef.current.connect(compRef.current); // dry path (pre-delay) to comp as well
+
     // when you create the master gain the first time
     masterGainRef.current = ctx.createGain();
     masterGainRef.current.gain.value = masterVol / 100;
@@ -447,7 +499,29 @@ export default function StudioProPage() {
       {/* Waveform visualizer */}
       import EffectsRack from "../../components/EffectsRack"; // ... inside your
       JSX return:
-      <EffectsRack />
+      <EffectsRack
+        onReverb={(wet) => {
+          if (!wetGainRef.current || !dryGainRef.current) return;
+          wetGainRef.current.gain.value = wet; // 0..1
+          dryGainRef.current.gain.value = 1 - wet;
+        }}
+        onDelay={(timeSec, feedback) => {
+          if (!delayRef.current || !feedbackRef.current) return;
+          delayRef.current.delayTime.value = Math.min(
+            0.6,
+            Math.max(0, timeSec)
+          );
+          feedbackRef.current.gain.value = Math.min(0.9, Math.max(0, feedback));
+        }}
+        onBass={(gainDb) => {
+          if (!lowShelfRef.current) return;
+          lowShelfRef.current.gain.value = gainDb; // in dB
+        }}
+        onCompress={(ratio) => {
+          if (!compRef.current) return;
+          compRef.current.ratio.value = ratio;
+        }}
+      />
       <div className="rounded border bg-white p-3">
         <div className="text-sm mb-2 text-gray-600">Waveform</div>
         <canvas
