@@ -1,46 +1,63 @@
+// src/app/components/EffectsRack.tsx
 "use client";
-
-import { useState } from "react";
-
-type Effect = {
-  name: string;
-  value: number;
-  min: number;
-  max: number;
-};
+import React, { useState } from "react";
 
 export default function EffectsRack() {
-  const [effects, setEffects] = useState<Effect[]>([
-    { name: "Reverb", value: 0, min: 0, max: 100 },
-    { name: "Delay", value: 0, min: 0, max: 100 },
-    { name: "EQ (Bass)", value: 0, min: -10, max: 10 },
-    { name: "Compression", value: 0, min: 0, max: 100 },
-  ]);
-
-  const handleChange = (index: number, newValue: number) => {
-    const updated = [...effects];
-    updated[index].value = newValue;
-    setEffects(updated);
-  };
+  const [reverb, setReverb] = useState(0);
+  const [delay, setDelay] = useState(0);
+  const [eq, setEq] = useState(0);
+  const [compression, setCompression] = useState(0);
 
   return (
-    <div className="bg-gray-100 rounded p-4 shadow-md mt-6">
-      <h2 className="font-semibold mb-3">🎛 Effects Rack</h2>
-      <div className="space-y-4">
-        {effects.map((effect, i) => (
-          <div key={effect.name}>
-            <label className="block text-sm font-medium">{effect.name}</label>
-            <input
-              type="range"
-              min={effect.min}
-              max={effect.max}
-              value={effect.value}
-              onChange={(e) => handleChange(i, Number(e.target.value))}
-              className="w-full"
-            />
-            <span className="text-xs text-gray-600">{effect.value}</span>
-          </div>
-        ))}
+    <div className="border p-4 rounded-md bg-gray-50 space-y-3">
+      <h3 className="font-semibold">🎚️ Effects Rack</h3>
+
+      <div>
+        <label>Reverb: {reverb}</label>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={reverb}
+          onChange={(e) => setReverb(Number(e.target.value))}
+          className="w-full"
+        />
+      </div>
+
+      <div>
+        <label>Delay: {delay}</label>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={delay}
+          onChange={(e) => setDelay(Number(e.target.value))}
+          className="w-full"
+        />
+      </div>
+
+      <div>
+        <label>EQ: {eq}</label>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={eq}
+          onChange={(e) => setEq(Number(e.target.value))}
+          className="w-full"
+        />
+      </div>
+
+      <div>
+        <label>Compression: {compression}</label>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={compression}
+          onChange={(e) => setCompression(Number(e.target.value))}
+          className="w-full"
+        />
       </div>
     </div>
   );
