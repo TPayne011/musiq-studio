@@ -6,11 +6,23 @@ export default function EffectsRack({
   onDelay,
   onBass,
   onCompress,
+  bypass = {},
+  onBypassChange,
 }: {
-  onReverb: (wet0to1: number) => void;
-  onDelay: (timeSec: number, feedback0to9: number) => void;
+  onReverb: (wet: number) => void;
+  onDelay: (timeSec: number, feedback: number) => void;
   onBass: (gainDb: number) => void;
   onCompress: (ratio: number) => void;
+  bypass?: Partial<{
+    reverb: boolean;
+    delay: boolean;
+    bass: boolean;
+    comp: boolean;
+  }>;
+  onBypassChange?: (
+    key: "reverb" | "delay" | "bass" | "comp",
+    v: boolean
+  ) => void;
 }) {
   const [reverb, setReverb] = useState(0); // 0..100 (wet)
   const [delay, setDelay] = useState(0); // 0..100 (maps to 0..0.6s)

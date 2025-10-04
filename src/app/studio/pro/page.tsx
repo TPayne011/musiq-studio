@@ -1,541 +1,353 @@
+// src/app/studio/pro/page.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-// If you don't have the @ alias in tsconfig, change to: ../../../lib/useLocalStorage
+import { useEffect, useRef, useState } from "react";
+import EffectsRack from "../../components/EffectsRack";
 import { useLocalStorage } from "@/lib/useLocalStorage";
-import EffectsRack from "@/app/components/EffectsRack";
 
-type Track = {
-  id: number;
-  name: string;
-  src: string | null; // preset "/audio/Rev.mp3" or blob: URL
-  volume: number; // 0..100
-  pan: number; // -100..100
-  el: HTMLAudioElement | null;
-};
-
-type SavedTrack = {
-  id: number;
-  name: string;
-  srcPreset: string | null; // only save preset paths
-  volume: number;
-  pan: number;
-};
-
-const TRACKS_KEY = "musiqProTracksV2";
-const MASTER_KEY = "musiqProMasterV1";
-
-const initialTracks: Omit<Track, "el">[] = [
-  { id: 1, name: "Track 1", src: "/audio/Rev.mp3", volume: 80, pan: 0 },
-  { id: 2, name: "Track 2", src: null, volume: 80, pan: 0 },
-];
-
-function loadSavedTracks(): Omit<Track, "el">[] | null {
-  try {
-    const raw = localStorage.getItem(TRACKS_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as SavedTrack[];
-    return parsed.map((t) => ({
-      id: t.id,
-      name: t.name,
-      src: t.srcPreset, // restore only preset paths (not local blobs)
-      volume: t.volume,
-      pan: t.pan,
-    }));
-  } catch {
-    return null;
-  }
-}
-
-export default function StudioProPage() {
-  // ---- Audio graph refs
-  const ctxRef = useRef<AudioContext | null>(null);
-  const masterGainRef = useRef<GainNode | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const wetGainRef = useRef<GainNode | null>(null);
-  const dryGainRef = useRef<GainNode | null>(null);
-
-  const sourceNodes = useRef<Map<number, MediaElementAudioSourceNode>>(
-    new Map()
-  );
-  const trackGains = useRef<Map<number, GainNode>>(new Map());
-  const trackPans = useRef<Map<number, StereoPannerNode>>(new Map());
-  const blobUrls = useRef<Map<number, string>>(new Map());
-  // Effect nodes (master FX chain)
-  const convolverRef = useRef<ConvolverNode | null>(null); // Reverb
-  const delayRef = useRef<DelayNode | null>(null); // Delay
-  const feedbackRef = useRef<GainNode | null>(null); // Delay feedback
-  const lowShelfRef = useRef<BiquadFilterNode | null>(null); // EQ (bass)
-  const compRef = useRef<DynamicsCompressorNode | null>(null); // Compression
-
-  // ---- State
-  const saved = typeof window !== "undefined" ? loadSavedTracks() : null;
-  const [tracks, setTracks] = useState<Track[]>(
-    (saved ?? initialTracks).map((t) => ({ ...t, el: null }))
-  );
-
-  // Persisted master volume (0..100)
+export default function ProStudioPage() {
+  // -------- Persisted UI state --------
   const [masterVol, setMasterVol] = useLocalStorage<number>(
     "musiqProMasterV1",
     100
-  );
-  const [ready, setReady] = useState(false);
-  const [stereoSupported, setStereoSupported] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  ); // 0..100
+  const [fxState, setFxState] = useLocalStorage("musiqProFxV1", {
+    reverbWet: 0, // 0..1
+    delayTime: 0.25, // seconds
+    delayFb: 0.2, // 0..1
+    bassDb: 0, // -10..+10
+    compRatio: 3, // 1..10
+  });
+  const [bypass, setBypass] = useLocalStorage("musiqProBypassV1", {
+    reverb: false,
+    delay: false,
+    bass: false,
+    comp: false,
+  });
 
-  // ---- Build audio graph once
+  // -------- Audio core --------
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+
+  // -------- Tracks (two tracks) --------
+  const [track1Url, setTrack1Url] = useState<string | null>("/audio/Rev.mp3"); // default sample
+  const [track2Url, setTrack2Url] = useState<string | null>(null);
+
+  const track1SourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const track2SourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const track1GainRef = useRef<GainNode | null>(null);
+  const track2GainRef = useRef<GainNode | null>(null);
+  const track1PanRef = useRef<StereoPannerNode | null>(null);
+  const track2PanRef = useRef<StereoPannerNode | null>(null);
+
+  // -------- FX nodes --------
+  const convolverRef = useRef<ConvolverNode | null>(null); // reverb
+  const wetGainRef = useRef<GainNode | null>(null);
+  const dryGainRef = useRef<GainNode | null>(null);
+  const delayRef = useRef<DelayNode | null>(null);
+  const feedbackRef = useRef<GainNode | null>(null);
+  const lowShelfRef = useRef<BiquadFilterNode | null>(null); // bass EQ
+  const compRef = useRef<DynamicsCompressorNode | null>(null); // compressor
+  const limiterRef = useRef<DynamicsCompressorNode | null>(null); // soft limiter
+
+  const [isReady, setIsReady] = useState(false);
+
+  // -------- Helpers --------
+  async function loadBuffer(url: string): Promise<AudioBuffer> {
+    const ctx = audioCtxRef.current!;
+    const resp = await fetch(url);
+    const arr = await resp.arrayBuffer();
+    return await ctx.decodeAudioData(arr);
+  }
+
+  function stopTrack(track: 1 | 2) {
+    const srcRef = track === 1 ? track1SourceRef : track2SourceRef;
+    try {
+      srcRef.current?.stop();
+    } catch {}
+    srcRef.current = null;
+  }
+
+  async function playTrack(track: 1 | 2) {
+    const ctx = audioCtxRef.current!;
+    const url = track === 1 ? track1Url : track2Url;
+    if (!url) return;
+
+    // stop if playing
+    stopTrack(track);
+
+    const buffer = await loadBuffer(url);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+
+    // route: src -> gain -> pan -> masterGain
+    const gain = track === 1 ? track1GainRef.current! : track2GainRef.current!;
+    const pan = track === 1 ? track1PanRef.current! : track2PanRef.current!;
+    src.connect(gain);
+    gain.connect(pan);
+    pan.connect(masterGainRef.current!);
+
+    src.start();
+    if (track === 1) track1SourceRef.current = src;
+    else track2SourceRef.current = src;
+  }
+
+  // -------- Audio graph init (run once) --------
   useEffect(() => {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    const ctx = new AudioCtx();
-    ctxRef.current = ctx;
+    if (audioCtxRef.current) return;
 
-    const canStereo = typeof (ctx as any).createStereoPanner === "function";
-    setStereoSupported(canStereo);
+    const ctx = new (window.AudioContext ||
+      (window as any).webkitAudioContext)();
+    audioCtxRef.current = ctx;
 
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 1024;
-    analyserRef.current = analyser;
+    // core
+    masterGainRef.current = ctx.createGain();
+    masterGainRef.current.gain.value = (masterVol ?? 100) / 100;
 
-    const master = ctx.createGain();
-    master.gain.value = masterVol / 100;
-    masterGainRef.current = master;
-    // ----- FX nodes -----
+    analyserRef.current = ctx.createAnalyser();
+    analyserRef.current.fftSize = 2048;
+
+    // tracks
+    track1GainRef.current = ctx.createGain();
+    track2GainRef.current = ctx.createGain();
+    track1PanRef.current = ctx.createStereoPanner();
+    track2PanRef.current = ctx.createStereoPanner();
+
+    // FX
+    // reverb (tiny impulse)
     convolverRef.current = ctx.createConvolver();
-    // quick tiny impulse for "room" reverb
-    {
-      const len = 2048;
-      const impulse = ctx.createBuffer(2, len, ctx.sampleRate);
-      for (let ch = 0; ch < 2; ch++) {
-        const data = impulse.getChannelData(ch);
-        for (let i = 0; i < len; i++)
-          data[i] = (Math.random() * 2 - 1) * (1 - i / len);
-      }
-      convolverRef.current.buffer = impulse;
+    const len = 2048;
+    const impulse = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = impulse.getChannelData(ch);
+      for (let i = 0; i < len; i++)
+        data[i] = (Math.random() * 2 - 1) * (1 - i / len);
     }
+    convolverRef.current.buffer = impulse;
 
-    delayRef.current = ctx.createDelay(1.0); // max 1s
+    wetGainRef.current = ctx.createGain();
+    dryGainRef.current = ctx.createGain();
+    wetGainRef.current.gain.value = fxState.reverbWet ?? 0;
+    dryGainRef.current.gain.value = 1 - (fxState.reverbWet ?? 0);
+
+    delayRef.current = ctx.createDelay(1.0);
     feedbackRef.current = ctx.createGain();
-    feedbackRef.current.gain.value = 0.2; // subtle default
+    feedbackRef.current.gain.value = fxState.delayFb ?? 0.2;
+    delayRef.current.delayTime.value = fxState.delayTime ?? 0.25;
     delayRef.current.connect(feedbackRef.current);
     feedbackRef.current.connect(delayRef.current); // feedback loop
 
     lowShelfRef.current = ctx.createBiquadFilter();
     lowShelfRef.current.type = "lowshelf";
-    lowShelfRef.current.frequency.value = 200; // bass shelf point
-    lowShelfRef.current.gain.value = 0;
+    lowShelfRef.current.frequency.value = 200;
+    lowShelfRef.current.gain.value = fxState.bassDb ?? 0;
 
     compRef.current = ctx.createDynamicsCompressor();
     compRef.current.threshold.value = -24;
     compRef.current.knee.value = 30;
-    compRef.current.ratio.value = 3;
+    compRef.current.ratio.value = fxState.compRatio ?? 3;
     compRef.current.attack.value = 0.003;
     compRef.current.release.value = 0.25;
 
-    // ----- Master routing: masterGain -> EQ -> Delay -> Reverb -> Compressor -> Analyser -> Destination
-    masterGainRef.current
-      .connect(lowShelfRef.current)
-      .connect(delayRef.current)
-      .connect(convolverRef.current)
-      .connect(compRef.current)
-      .connect(analyserRef.current!);
+    limiterRef.current = ctx.createDynamicsCompressor();
+    limiterRef.current.threshold.value = -2;
+    limiterRef.current.knee.value = 0;
+    limiterRef.current.ratio.value = 20;
+    limiterRef.current.attack.value = 0.003;
+    limiterRef.current.release.value = 0.05;
 
-    delayRef.current.connect(compRef.current); // dry+wet mix via parallel: we’ll add dry below
-    lowShelfRef.current.connect(compRef.current); // dry path (pre-delay) to comp as well
+    // ROUTING
+    // tracks -> master
+    track1GainRef.current
+      .connect(track1PanRef.current)
+      .connect(masterGainRef.current);
+    track2GainRef.current
+      .connect(track2PanRef.current)
+      .connect(masterGainRef.current);
 
-    // when you create the master gain the first time
-    masterGainRef.current = ctx.createGain();
-    masterGainRef.current.gain.value = masterVol / 100;
+    // master -> low shelf
+    masterGainRef.current.connect(lowShelfRef.current);
 
-    // master -> analyser -> destination
-    master.connect(analyser);
-    analyser.connect(ctx.destination);
+    // lowshelf -> dry & reverb sends
+    lowShelfRef.current.connect(dryGainRef.current);
+    lowShelfRef.current.connect(wetGainRef.current);
 
-    // Create audio elements + per-track nodes
-    const updated = tracks.map((t) => {
-      const el = new Audio();
-      el.loop = true;
-      if (t.src) el.src = t.src;
-      el.volume = t.volume / 100;
+    // reverb path
+    wetGainRef.current.connect(convolverRef.current);
+    convolverRef.current.connect(compRef.current);
 
-      const src = ctx.createMediaElementSource(el);
-      sourceNodes.current.set(t.id, src);
+    // delay (parallel)
+    lowShelfRef.current.connect(delayRef.current);
+    delayRef.current.connect(compRef.current);
 
-      const g = ctx.createGain();
-      g.gain.value = t.volume / 100;
-      trackGains.current.set(t.id, g);
+    // dry path into comp
+    dryGainRef.current.connect(compRef.current);
 
-      let panner: StereoPannerNode | null = null;
-      if (canStereo) {
-        panner = (ctx as any).createStereoPanner() as StereoPannerNode;
-        panner.pan.value = t.pan / 100;
-        trackPans.current.set(t.id, panner);
-      }
+    // comp -> limiter -> analyser -> out
+    compRef.current.connect(limiterRef.current);
+    limiterRef.current.connect(analyserRef.current);
+    analyserRef.current.connect(ctx.destination);
 
-      // Chain: src -> gain -> pan? -> master
-      if (panner) {
-        src.connect(g);
-        g.connect(panner);
-        panner.connect(master);
-      } else {
-        src.connect(g);
-        g.connect(master);
-      }
+    // honor bypass at startup
+    if (bypass.reverb) {
+      wetGainRef.current.gain.value = 0;
+      dryGainRef.current.gain.value = 1;
+    }
+    if (bypass.delay) {
+      delayRef.current.delayTime.value = 0;
+      feedbackRef.current.gain.value = 0;
+    }
+    if (bypass.bass) {
+      lowShelfRef.current.gain.value = 0;
+    }
+    if (bypass.comp) {
+      compRef.current.ratio.value = 1;
+    }
 
-      return { ...t, el };
-    });
-
-    setTracks(updated);
-    setReady(true);
+    setIsReady(true);
 
     return () => {
-      try {
-        updated.forEach((t) => t.el?.pause());
-      } catch {}
-      try {
-        ctx.close();
-      } catch {}
-      sourceNodes.current.clear();
-      trackGains.current.clear();
-      trackPans.current.clear();
-      // revoke blob URLs
-      blobUrls.current.forEach((u) => {
-        try {
-          URL.revokeObjectURL(u);
-        } catch {}
-      });
-      blobUrls.current.clear();
+      ctx.close().catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- Apply master volume changes
-  // ---- Apply master volume changes
-  useEffect(() => {
-    if (masterGainRef.current)
-      masterGainRef.current.gain.value = masterVol / 100;
-  }, [masterVol]);
-
-  // ---- Persist track settings (preset src/volume/pan) when they change
-  useEffect(() => {
-    if (!ready) return;
-    const data: SavedTrack[] = tracks.map((t) => ({
-      id: t.id,
-      name: t.name,
-      volume: t.volume,
-      pan: t.pan,
-      srcPreset: t.src && t.src.startsWith("/") ? t.src : null,
-    }));
-    try {
-      localStorage.setItem(TRACKS_KEY, JSON.stringify(data));
-    } catch {}
-  }, [tracks, ready]);
-
-  const resumeCtx = async () => {
-    const ctx = ctxRef.current;
-    if (ctx && ctx.state !== "running") {
-      try {
-        await ctx.resume();
-      } catch {}
-    }
-  };
-
-  const playAll = async () => {
-    setError(null);
-    await resumeCtx();
-    await Promise.all(
-      tracks.map(async (t) => {
-        if (t.el && t.el.src) {
-          try {
-            await t.el.play();
-          } catch {}
-        }
-      })
-    );
-  };
-  const pauseAll = () => tracks.forEach((t) => t.el?.pause());
-  const stopAll = () =>
-    tracks.forEach((t) => {
-      if (t.el) {
-        t.el.pause();
-        t.el.currentTime = 0;
-      }
-    });
-
-  // ---- UI handlers
-  const setPreset = (id: number, value: string) => {
-    const val = value || null;
-    setTracks((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        if (t.el) {
-          t.el.onloadedmetadata = async () => {
-            await resumeCtx();
-            if (val) t.el!.play().catch(() => {});
-          };
-          t.el.onerror = () =>
-            setError("Preset failed to load (check /public/audio path)");
-          t.el.src = val ?? "";
-          t.el.load();
-        }
-        return { ...t, src: val };
-      })
-    );
-  };
-
-  const onPickLocal = (id: number, list: FileList | null) => {
-    const f = list?.[0];
-    if (!f) return;
-    const url = URL.createObjectURL(f);
-
-    setTracks((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-
-        const prevUrl = blobUrls.current.get(id);
-        if (prevUrl?.startsWith("blob:")) {
-          try {
-            URL.revokeObjectURL(prevUrl);
-          } catch {}
-        }
-        blobUrls.current.set(id, url);
-
-        if (t.el) {
-          t.el.onloadedmetadata = async () => {
-            await resumeCtx();
-            t.el!.play().catch(() => {});
-          };
-          t.el.onerror = () =>
-            setError("Couldn’t load that file (try mp3/wav).");
-          t.el.src = url;
-          t.el.load();
-        }
-        return { ...t, src: url };
-      })
-    );
-  };
-
-  const onVolume = (id: number, v: number) => {
-    setTracks((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        if (t.el) t.el.volume = v / 100;
-        const node = trackGains.current.get(id);
-        if (node && ctxRef.current)
-          node.gain.setValueAtTime(v / 100, ctxRef.current.currentTime);
-        return { ...t, volume: v };
-      })
-    );
-  };
-
-  const onPan = (id: number, v: number) => {
-    setTracks((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        const node = trackPans.current.get(id);
-        if (node && ctxRef.current)
-          node.pan.setValueAtTime(v / 100, ctxRef.current.currentTime);
-        return { ...t, pan: v };
-      })
-    );
-  };
-
-  // ---- Simple waveform visualizer (time-domain) on master analyser
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  useEffect(() => {
-    if (!analyserRef.current || !canvasRef.current) return;
-    const analyser = analyserRef.current;
-    const canvas = canvasRef.current;
-    const ctx2d = canvas.getContext("2d");
-    if (!ctx2d) return;
-
-    const buffer = new Uint8Array(analyser.frequencyBinCount);
-    let raf = 0;
-
-    const draw = () => {
-      raf = requestAnimationFrame(draw);
-      analyser.getByteTimeDomainData(buffer);
-
-      // clear
-      ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-
-      // axis
-      ctx2d.lineWidth = 1;
-      ctx2d.strokeStyle = "#ddd";
-      ctx2d.beginPath();
-      ctx2d.moveTo(0, canvas.height / 2);
-      ctx2d.lineTo(canvas.width, canvas.height / 2);
-      ctx2d.stroke();
-
-      // waveform
-      ctx2d.lineWidth = 2;
-      ctx2d.strokeStyle = "#333";
-      ctx2d.beginPath();
-      const slice = canvas.width / buffer.length;
-      for (let i = 0; i < buffer.length; i++) {
-        const v = buffer[i] / 128.0; // 0..255 -> ~0..2
-        const y = (v * canvas.height) / 2;
-        const x = i * slice;
-        i === 0 ? ctx2d.moveTo(x, y) : ctx2d.lineTo(x, y);
-      }
-      ctx2d.stroke();
-    };
-
-    draw();
-    return () => cancelAnimationFrame(raf);
-  }, [analyserRef.current]);
-
-  const isLocal = (src: string | null) => !!src && !src.startsWith("/");
-
+  // -------- UI --------
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8 space-y-6">
-      <h1 className="text-3xl font-bold">Studio Pro — 2 Tracks</h1>
-      {/* Transport + Master */}
-      <div className="rounded border bg-white p-3 flex flex-wrap items-center gap-3">
-        <button
-          onClick={playAll}
-          className="rounded border px-3 py-1 hover:bg-gray-50"
-        >
-          ▶ Play
-        </button>
-        <button
-          onClick={pauseAll}
-          className="rounded border px-3 py-1 hover:bg-gray-50"
-        >
-          ⏸ Pause
-        </button>
-        <button
-          onClick={stopAll}
-          className="rounded border px-3 py-1 hover:bg-gray-50"
-        >
-          ⏹ Stop
-        </button>
+    <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+      <h1 className="text-2xl font-bold">Studio Pro</h1>
+      <p className="text-sm text-gray-600">
+        Two-track player with reverb, delay, bass EQ, compression, soft limiter,
+        and persistence.
+      </p>
 
-        <div className="ml-auto flex items-center gap-2">
-          <label className="text-sm w-16">Master</label>
+      {/* Master volume */}
+      <div className="border rounded-md p-4">
+        <label className="block font-medium">Master Volume</label>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={masterVol}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            setMasterVol(v);
+            if (masterGainRef.current)
+              masterGainRef.current.gain.value = v / 100;
+          }}
+          className="w-full"
+        />
+        <div className="text-xs text-gray-600">{masterVol}%</div>
+      </div>
+
+      {/* Track 1 */}
+      <div className="border rounded-md p-4">
+        <h3 className="font-semibold">Track 1</h3>
+        <div className="flex items-center gap-2 mt-2">
           <input
-            type="range"
-            min={0}
-            max={100}
-            value={masterVol}
-            onChange={(e) => setMasterVol(Number(e.target.value))}
-            className="w-40"
+            type="text"
+            className="border px-2 py-1 rounded w-full"
+            value={track1Url ?? ""}
+            placeholder="/audio/Rev.mp3 or https://..."
+            onChange={(e) => setTrack1Url(e.target.value || null)}
           />
-          <span className="text-sm w-10 text-right">{masterVol}%</span>
+          <button
+            className="px-3 py-1 rounded bg-gray-900 text-white"
+            onClick={() => playTrack(1)}
+            disabled={!isReady || !track1Url}
+          >
+            Play
+          </button>
+          <button
+            className="px-3 py-1 rounded bg-gray-200"
+            onClick={() => stopTrack(1)}
+            disabled={!isReady}
+          >
+            Stop
+          </button>
         </div>
       </div>
-      {/* Two tracks side-by-side */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {tracks.map((t) => (
-          <div key={t.id} className="rounded border bg-white p-3 space-y-3">
-            <div className="font-medium">{t.name}</div>
 
-            {/* Source: Preset or Local */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm w-16">Source</label>
-              <select
-                className="rounded border px-2 py-1"
-                value={t.src?.startsWith("/") ? t.src : ""}
-                onChange={(e) => setPreset(t.id, e.target.value)}
-              >
-                <option value="">(none)</option>
-                <option value="/audio/Rev.mp3">Rev Beat</option>
-                {/* add more presets as you place files in /public/audio */}
-              </select>
-
-              <label className="rounded border px-2 py-1 cursor-pointer hover:bg-gray-50">
-                Local file…
-                <input
-                  type="file"
-                  accept="audio/*"
-                  className="hidden"
-                  onChange={(e) => onPickLocal(t.id, e.target.files)}
-                />
-              </label>
-            </div>
-            {isLocal(t.src) && (
-              <div className="text-xs text-gray-500">
-                Local file selected — won’t persist after refresh.
-              </div>
-            )}
-
-            {/* Volume */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm w-16">Volume</label>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={t.volume}
-                onChange={(e) => onVolume(t.id, Number(e.target.value))}
-                className="flex-1"
-              />
-              <span className="text-sm w-10 text-right">{t.volume}%</span>
-            </div>
-
-            {/* Pan */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm w-16">Pan</label>
-              <input
-                type="range"
-                min={-100}
-                max={100}
-                step={1}
-                disabled={!stereoSupported}
-                value={t.pan}
-                onChange={(e) => onPan(t.id, Number(e.target.value))}
-                className="flex-1"
-              />
-              <span className="text-sm w-16 text-right">
-                {t.pan < 0
-                  ? `L ${Math.abs(t.pan)}`
-                  : t.pan > 0
-                  ? `R ${t.pan}`
-                  : "C"}
-              </span>
-            </div>
-          </div>
-        ))}
+      {/* Track 2 */}
+      <div className="border rounded-md p-4">
+        <h3 className="font-semibold">Track 2</h3>
+        <div className="flex items-center gap-2 mt-2">
+          <input
+            type="text"
+            className="border px-2 py-1 rounded w-full"
+            value={track2Url ?? ""}
+            placeholder="Paste a URL or /audio/... path"
+            onChange={(e) => setTrack2Url(e.target.value || null)}
+          />
+          <button
+            className="px-3 py-1 rounded bg-gray-900 text-white"
+            onClick={() => playTrack(2)}
+            disabled={!isReady || !track2Url}
+          >
+            Play
+          </button>
+          <button
+            className="px-3 py-1 rounded bg-gray-200"
+            onClick={() => stopTrack(2)}
+            disabled={!isReady}
+          >
+            Stop
+          </button>
+        </div>
       </div>
-      {/* Waveform visualizer */}
-      import EffectsRack from "../../components/EffectsRack"; // ... inside your
-      JSX return:
+
+      {/* Effects Rack */}
       <EffectsRack
         onReverb={(wet) => {
           if (!wetGainRef.current || !dryGainRef.current) return;
-          wetGainRef.current.gain.value = wet; // 0..1
+          wetGainRef.current.gain.value = wet;
           dryGainRef.current.gain.value = 1 - wet;
+          setFxState((s: any) => ({ ...s, reverbWet: wet }));
         }}
-        onDelay={(timeSec, feedback) => {
+        onDelay={(timeSec, fb) => {
           if (!delayRef.current || !feedbackRef.current) return;
           delayRef.current.delayTime.value = Math.min(
             0.6,
             Math.max(0, timeSec)
           );
-          feedbackRef.current.gain.value = Math.min(0.9, Math.max(0, feedback));
+          feedbackRef.current.gain.value = Math.min(0.9, Math.max(0, fb));
+          setFxState((s: any) => ({ ...s, delayTime: timeSec, delayFb: fb }));
         }}
         onBass={(gainDb) => {
           if (!lowShelfRef.current) return;
-          lowShelfRef.current.gain.value = gainDb; // in dB
+          lowShelfRef.current.gain.value = gainDb;
+          setFxState((s: any) => ({ ...s, bassDb: gainDb }));
         }}
         onCompress={(ratio) => {
           if (!compRef.current) return;
           compRef.current.ratio.value = ratio;
+          setFxState((s: any) => ({ ...s, compRatio: ratio }));
+        }}
+        bypass={bypass}
+        onBypassChange={(key, v) => {
+          setBypass((b: any) => ({ ...b, [key]: v }));
+          if (
+            key === "reverb" &&
+            wetGainRef.current &&
+            dryGainRef.current &&
+            v
+          ) {
+            wetGainRef.current.gain.value = 0;
+            dryGainRef.current.gain.value = 1;
+          }
+          if (key === "delay" && delayRef.current && feedbackRef.current && v) {
+            delayRef.current.delayTime.value = 0;
+            feedbackRef.current.gain.value = 0;
+          }
+          if (key === "bass" && lowShelfRef.current && v) {
+            lowShelfRef.current.gain.value = 0;
+          }
+          if (key === "comp" && compRef.current && v) {
+            compRef.current.ratio.value = 1; // 1:1 ≈ off
+          }
         }}
       />
-      <div className="rounded border bg-white p-3">
-        <div className="text-sm mb-2 text-gray-600">Waveform</div>
-        <canvas
-          ref={canvasRef}
-          width={800}
-          height={120}
-          className="w-full h-32"
-        />
-      </div>
-      {error && (
-        <div className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-700">
-          {error}
-        </div>
-      )}
     </main>
   );
 }

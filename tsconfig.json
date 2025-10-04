@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "target": "esnext",
     "lib": [
       "dom",
       "dom.iterable",
@@ -8,8 +7,7 @@
     ],
     "allowJs": true,
     "skipLibCheck": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
+    "strict": false,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -18,13 +16,13 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "baseUrl": ".", // 👈 root dir for imports
+    "baseUrl": ".",
     "paths": {
-      // 👈 map @ to src
       "@/*": [
         "src/*"
       ]
     },
+    "target": "ES2017",
     "plugins": [
       {
         "name": "next"
@@ -32,12 +30,18 @@
     ]
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
     "next-env.d.ts",
+    "next.config.*",
+    "postcss.config.*",
+    "src/**/*",
+    "tailwind.config.*",
     ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next",
+    "dist",
+    "out",
+    ".turbo"
   ]
 }
