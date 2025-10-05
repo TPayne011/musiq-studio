@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import EffectsRack from "../../components/EffectsRack";
+import Visualizer from "../../components/Visualizer";
 import { useLocalStorage } from "@/lib/useLocalStorage";
 
 export default function ProStudioPage() {
@@ -31,11 +32,19 @@ export default function ProStudioPage() {
   const analyserRef = useRef<AnalyserNode | null>(null);
 
   // -------- Tracks (two tracks) --------
-  const [track1Url, setTrack1Url] = useState<string | null>("/audio/Rev.mp3"); // default sample
+  const [track1Url, setTrack1Url] = useState<string | null>(
+    "/audio/sample-beat.mp3"
+  );
+  // default sample
   const [track2Url, setTrack2Url] = useState<string | null>(null);
 
-  const track1SourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const track2SourceRef = useRef<AudioBufferSourceNode | null>(null);
+  // HTML <audio> elements + media sources (for pause/resume)
+  const audio1Ref = useRef<HTMLAudioElement | null>(null);
+  const audio2Ref = useRef<HTMLAudioElement | null>(null);
+  const mediaSrc1Ref = useRef<MediaElementAudioSourceNode | null>(null);
+  const mediaSrc2Ref = useRef<MediaElementAudioSourceNode | null>(null);
+
+  // Per-track gain & pan
   const track1GainRef = useRef<GainNode | null>(null);
   const track2GainRef = useRef<GainNode | null>(null);
   const track1PanRef = useRef<StereoPannerNode | null>(null);
@@ -53,44 +62,32 @@ export default function ProStudioPage() {
 
   const [isReady, setIsReady] = useState(false);
 
-  // -------- Helpers --------
-  async function loadBuffer(url: string): Promise<AudioBuffer> {
-    const ctx = audioCtxRef.current!;
-    const resp = await fetch(url);
-    const arr = await resp.arrayBuffer();
-    return await ctx.decodeAudioData(arr);
-  }
-
-  function stopTrack(track: 1 | 2) {
-    const srcRef = track === 1 ? track1SourceRef : track2SourceRef;
-    try {
-      srcRef.current?.stop();
-    } catch {}
-    srcRef.current = null;
-  }
-
-  async function playTrack(track: 1 | 2) {
-    const ctx = audioCtxRef.current!;
-    const url = track === 1 ? track1Url : track2Url;
+  // -------- Helpers: MediaElement-based load/play/pause/stop --------
+  function loadTrack(n: 1 | 2, url: string | null) {
     if (!url) return;
+    const el = n === 1 ? audio1Ref.current : audio2Ref.current;
+    if (!el) return;
+    el.src = url;
+    el.load();
+  }
 
-    // stop if playing
-    stopTrack(track);
+  function playTrack(n: 1 | 2) {
+    const el = n === 1 ? audio1Ref.current : audio2Ref.current;
+    el?.play().catch(() => {
+      /* ignore autoplay block */
+    });
+  }
 
-    const buffer = await loadBuffer(url);
-    const src = ctx.createBufferSource();
-    src.buffer = buffer;
+  function pauseTrack(n: 1 | 2) {
+    const el = n === 1 ? audio1Ref.current : audio2Ref.current;
+    el?.pause();
+  }
 
-    // route: src -> gain -> pan -> masterGain
-    const gain = track === 1 ? track1GainRef.current! : track2GainRef.current!;
-    const pan = track === 1 ? track1PanRef.current! : track2PanRef.current!;
-    src.connect(gain);
-    gain.connect(pan);
-    pan.connect(masterGainRef.current!);
-
-    src.start();
-    if (track === 1) track1SourceRef.current = src;
-    else track2SourceRef.current = src;
+  function stopTrack(n: 1 | 2) {
+    const el = n === 1 ? audio1Ref.current : audio2Ref.current;
+    if (!el) return;
+    el.pause();
+    el.currentTime = 0;
   }
 
   // -------- Audio graph init (run once) --------
@@ -101,21 +98,49 @@ export default function ProStudioPage() {
       (window as any).webkitAudioContext)();
     audioCtxRef.current = ctx;
 
-    // core
+    // Core
     masterGainRef.current = ctx.createGain();
     masterGainRef.current.gain.value = (masterVol ?? 100) / 100;
 
     analyserRef.current = ctx.createAnalyser();
     analyserRef.current.fftSize = 2048;
 
-    // tracks
+    // Track nodes
     track1GainRef.current = ctx.createGain();
     track2GainRef.current = ctx.createGain();
     track1PanRef.current = ctx.createStereoPanner();
     track2PanRef.current = ctx.createStereoPanner();
 
+    // Create <audio> elements
+    audio1Ref.current = new Audio();
+    audio2Ref.current = new Audio();
+    audio1Ref.current.preload = "auto";
+    audio2Ref.current.preload = "auto";
+
+    // Default src if present
+    if (track1Url) audio1Ref.current.src = track1Url;
+    if (track2Url) audio2Ref.current.src = track2Url;
+
+    // Media sources
+    mediaSrc1Ref.current = new MediaElementAudioSourceNode(ctx, {
+      mediaElement: audio1Ref.current!,
+    });
+    mediaSrc2Ref.current = new MediaElementAudioSourceNode(ctx, {
+      mediaElement: audio2Ref.current!,
+    });
+
+    // Route: <audio> -> trackGain -> trackPan -> masterGain
+    mediaSrc1Ref.current.connect(track1GainRef.current);
+    mediaSrc2Ref.current.connect(track2GainRef.current);
+
+    track1GainRef.current
+      .connect(track1PanRef.current)
+      .connect(masterGainRef.current);
+    track2GainRef.current
+      .connect(track2PanRef.current)
+      .connect(masterGainRef.current);
+
     // FX
-    // reverb (tiny impulse)
     convolverRef.current = ctx.createConvolver();
     const len = 2048;
     const impulse = ctx.createBuffer(2, len, ctx.sampleRate);
@@ -136,7 +161,7 @@ export default function ProStudioPage() {
     feedbackRef.current.gain.value = fxState.delayFb ?? 0.2;
     delayRef.current.delayTime.value = fxState.delayTime ?? 0.25;
     delayRef.current.connect(feedbackRef.current);
-    feedbackRef.current.connect(delayRef.current); // feedback loop
+    feedbackRef.current.connect(delayRef.current);
 
     lowShelfRef.current = ctx.createBiquadFilter();
     lowShelfRef.current.type = "lowshelf";
@@ -157,16 +182,8 @@ export default function ProStudioPage() {
     limiterRef.current.attack.value = 0.003;
     limiterRef.current.release.value = 0.05;
 
-    // ROUTING
-    // tracks -> master
-    track1GainRef.current
-      .connect(track1PanRef.current)
-      .connect(masterGainRef.current);
-    track2GainRef.current
-      .connect(track2PanRef.current)
-      .connect(masterGainRef.current);
-
-    // master -> low shelf
+    // Routing to FX
+    // master -> lowshelf
     masterGainRef.current.connect(lowShelfRef.current);
 
     // lowshelf -> dry & reverb sends
@@ -177,11 +194,11 @@ export default function ProStudioPage() {
     wetGainRef.current.connect(convolverRef.current);
     convolverRef.current.connect(compRef.current);
 
-    // delay (parallel)
+    // delay in parallel
     lowShelfRef.current.connect(delayRef.current);
     delayRef.current.connect(compRef.current);
 
-    // dry path into comp
+    // dry path
     dryGainRef.current.connect(compRef.current);
 
     // comp -> limiter -> analyser -> out
@@ -189,7 +206,7 @@ export default function ProStudioPage() {
     limiterRef.current.connect(analyserRef.current);
     analyserRef.current.connect(ctx.destination);
 
-    // honor bypass at startup
+    // Honor bypass at startup
     if (bypass.reverb) {
       wetGainRef.current.gain.value = 0;
       dryGainRef.current.gain.value = 1;
@@ -213,32 +230,43 @@ export default function ProStudioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep master gain in sync when slider/persisted value changes
+  useEffect(() => {
+    if (masterGainRef.current != null) {
+      masterGainRef.current.gain.value = (masterVol ?? 100) / 100;
+    }
+  }, [masterVol]);
+
+  // Auto-load when URLs change (optional convenience)
+  useEffect(() => {
+    if (audio1Ref.current) loadTrack(1, track1Url);
+  }, [track1Url]);
+  useEffect(() => {
+    if (audio2Ref.current) loadTrack(2, track2Url);
+  }, [track2Url]);
+
   // -------- UI --------
   return (
     <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       <h1 className="text-2xl font-bold">Studio Pro</h1>
       <p className="text-sm text-gray-600">
         Two-track player with reverb, delay, bass EQ, compression, soft limiter,
-        and persistence.
+        visualizer, and persistence.
       </p>
 
       {/* Master volume */}
-      <div className="border rounded-md p-4">
+      <div className="border rounded-md p-4 space-y-3">
         <label className="block font-medium">Master Volume</label>
         <input
           type="range"
           min={0}
           max={100}
           value={masterVol}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            setMasterVol(v);
-            if (masterGainRef.current)
-              masterGainRef.current.gain.value = v / 100;
-          }}
+          onChange={(e) => setMasterVol(Number(e.target.value))}
           className="w-full"
         />
         <div className="text-xs text-gray-600">{masterVol}%</div>
+        <Visualizer analyser={analyserRef} />
       </div>
 
       {/* Track 1 */}
@@ -250,7 +278,11 @@ export default function ProStudioPage() {
             className="border px-2 py-1 rounded w-full"
             value={track1Url ?? ""}
             placeholder="/audio/Rev.mp3 or https://..."
-            onChange={(e) => setTrack1Url(e.target.value || null)}
+            onChange={(e) => {
+              const v = e.target.value || null;
+              setTrack1Url(v);
+              loadTrack(1, v);
+            }}
           />
           <button
             className="px-3 py-1 rounded bg-gray-900 text-white"
@@ -258,6 +290,13 @@ export default function ProStudioPage() {
             disabled={!isReady || !track1Url}
           >
             Play
+          </button>
+          <button
+            className="px-3 py-1 rounded bg-gray-500 text-white"
+            onClick={() => pauseTrack(1)}
+            disabled={!isReady}
+          >
+            Pause
           </button>
           <button
             className="px-3 py-1 rounded bg-gray-200"
@@ -278,7 +317,11 @@ export default function ProStudioPage() {
             className="border px-2 py-1 rounded w-full"
             value={track2Url ?? ""}
             placeholder="Paste a URL or /audio/... path"
-            onChange={(e) => setTrack2Url(e.target.value || null)}
+            onChange={(e) => {
+              const v = e.target.value || null;
+              setTrack2Url(v);
+              loadTrack(2, v);
+            }}
           />
           <button
             className="px-3 py-1 rounded bg-gray-900 text-white"
@@ -286,6 +329,13 @@ export default function ProStudioPage() {
             disabled={!isReady || !track2Url}
           >
             Play
+          </button>
+          <button
+            className="px-3 py-1 rounded bg-gray-500 text-white"
+            onClick={() => pauseTrack(2)}
+            disabled={!isReady}
+          >
+            Pause
           </button>
           <button
             className="px-3 py-1 rounded bg-gray-200"
