@@ -1,41 +1,80 @@
 "use client";
-import { useEffect, useRef } from "react";
 
-interface Props {
-  analyser: AnalyserNode | null;
-}
+import React, { useEffect, useRef } from "react";
 
-export default function Visualizer({ analyser }: Props) {
+type Props = {
+  /** Ref to the shared AnalyserNode created in the page */
+  analyser: React.RefObject<AnalyserNode>;
+  /** "bars" for spectrum, "wave" for waveform */
+  mode?: "bars" | "wave";
+};
+
+export default function Visualizer({ analyser, mode = "bars" }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
+    const an = analyser.current;
     const canvas = canvasRef.current;
-    if (!analyser || !canvas) return;
+    if (!an || !canvas) return;
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const data = new Uint8Array(analyser.frequencyBinCount);
+    // Configure analyser (these are safe to set each mount)
+    if (mode === "bars") {
+      an.fftSize = 1024; // smaller for chunkier bars
+    } else {
+      an.fftSize = 2048; // larger for smoother waveform
+    }
+
+    const bufferLen = mode === "bars" ? an.frequencyBinCount : an.fftSize; // waveform uses time domain length
+    const data =
+      mode === "bars" ? new Uint8Array(bufferLen) : new Uint8Array(bufferLen);
+
     let rafId = 0;
 
-    const render = () => {
-      analyser.getByteFrequencyData(data);
+    const draw = () => {
+      rafId = requestAnimationFrame(draw);
+
       const { width, height } = canvas;
       ctx.clearRect(0, 0, width, height);
-      const barW = Math.max(1, (width / data.length) * 2.0);
-      let x = 0;
-      for (let i = 0; i < data.length; i++) {
-        const v = data[i];
-        const barH = (v / 255) * height;
-        ctx.fillStyle = "#2563eb";
-        ctx.fillRect(x, height - barH, barW, barH);
-        x += barW + 1;
+
+      if (mode === "bars") {
+        an.getByteFrequencyData(data); // 0..255
+        const barWidth = Math.max(1, Math.floor(width / bufferLen));
+        for (let i = 0; i < bufferLen; i++) {
+          const v = data[i]; // 0..255
+          const barHeight = (v / 255) * height;
+          // simple gradient-ish coloring
+          ctx.fillStyle = `hsl(${(i / bufferLen) * 200 + 160}, 70%, 55%)`;
+          ctx.fillRect(
+            i * barWidth,
+            height - barHeight,
+            barWidth - 1,
+            barHeight
+          );
+        }
+      } else {
+        // waveform
+        an.getByteTimeDomainData(data); // 0..255 centered around 128
+        ctx.strokeStyle = "#111";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const slice = width / bufferLen;
+        for (let i = 0; i < bufferLen; i++) {
+          const v = (data[i] - 128) / 128; // -1..1
+          const x = i * slice;
+          const y = height / 2 + v * (height / 2) * 0.9;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
       }
-      rafId = requestAnimationFrame(render);
     };
 
-    rafId = requestAnimationFrame(render);
+    draw();
     return () => cancelAnimationFrame(rafId);
-  }, [analyser]);
+  }, [analyser, mode]);
 
   return (
     <canvas
