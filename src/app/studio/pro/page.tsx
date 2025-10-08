@@ -442,6 +442,17 @@ export default function ProStudioPage() {
   // ---------- UI ----------
   return (
     <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+      {/* Header + Quick Start */}
+      <h1 className="text-2xl font-bold flex items-center justify-between">
+        <span>Studio Pro</span>
+        <button
+          className="px-3 py-1 rounded bg-blue-100 text-sm hover:bg-blue-200 transition"
+          onClick={() => window.open("/docs/quickstart", "_blank")}
+        >
+          ❓ Quick Start Guide
+        </button>
+      </h1>
+
       {/* Unlock + status */}
       <div className="flex items-center gap-3">
         <button
