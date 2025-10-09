@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 export default function HomeHero() {
   return (
     <>
-      {/* --- Animated background grid + waves --- */}
+      {/* Animated background */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black,transparent_65%)]"
@@ -35,7 +35,7 @@ export default function HomeHero() {
         />
       </div>
 
-      {/* --- Top bar --- */}
+      {/* Top bar */}
       <header className="relative z-10 border-b border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link href="/" className="text-lg font-semibold tracking-wide">
@@ -55,7 +55,7 @@ export default function HomeHero() {
         </div>
       </header>
 
-      {/* --- Hero --- */}
+      {/* Hero */}
       <section className="relative z-10 mx-auto max-w-6xl px-6 pt-20 pb-10 text-center">
         <motion.h1
           initial={{ opacity: 0, y: 14 }}
@@ -104,7 +104,7 @@ export default function HomeHero() {
         />
       </section>
 
-      {/* --- Features --- */}
+      {/* Features */}
       <section className="relative z-10 mx-auto grid max-w-6xl grid-cols-1 gap-6 px-6 pb-16 md:grid-cols-3">
         {[
           {
@@ -133,7 +133,7 @@ export default function HomeHero() {
         ))}
       </section>
 
-      {/* --- Footer --- */}
+      {/* Footer */}
       <footer className="relative z-10 border-t border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6 text-sm text-gray-400">
           <span>© {new Date().getFullYear()} Musiq Studio</span>
