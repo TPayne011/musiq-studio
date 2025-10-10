@@ -35,26 +35,6 @@ export default function HomeHero() {
         />
       </div>
 
-      {/* Top bar */}
-      <header className="relative z-10 border-b border-white/10">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="text-lg font-semibold tracking-wide">
-            Musiq Studio
-          </Link>
-          <nav className="flex items-center gap-4 text-sm">
-            <Link href="/studio" className="opacity-90 hover:opacity-100">
-              Studio
-            </Link>
-            <Link href="/market" className="opacity-90 hover:opacity-100">
-              Market
-            </Link>
-            <Link href="/about" className="opacity-90 hover:opacity-100">
-              About
-            </Link>
-          </nav>
-        </div>
-      </header>
-
       {/* Hero */}
       <section className="relative z-10 mx-auto max-w-6xl px-6 pt-20 pb-10 text-center">
         <motion.h1
