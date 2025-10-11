@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLocalStorage } from "@/lib/useLocalStorage";
-import Visualizer from "../components/Visualizer";
+import Visualizer from "@/components/Visualizer";
 import PiWireframes from "@/components/PiWireframes";
 import { redirect } from "next/navigation";
 

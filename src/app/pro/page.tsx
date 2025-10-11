@@ -1,29 +1,31 @@
 // src/app/pro/page.tsx
 "use client";
 
-import Script from "next/script";
-import { useEffect, useRef, useState } from "react";
-
-// NOTE: components folder is under /app now, so the relative path changes
-import EffectsRack from "../components/EffectsRack";
-import Visualizer from "../components/Visualizer";
-
+import EffectsRack from "@/components/EffectsRack";        // remove if you’re de-scoping FX
+import Visualizer from "@/components/Visualizer";
 import { useLocalStorage } from "@/lib/useLocalStorage";
-import { encodeWavStereo } from "@/lib/wav";
-
-// --- clamp helper ---
-const clamp = (n: number, min: number, max: number) =>
-  Math.min(max, Math.max(min, n));
-
-// --- decode any URL into an AudioBuffer using a provided (Offline)AudioContext ---
-async function fetchAsAudioBuffer(url: string, ctx: BaseAudioContext) {
-  const res = await fetch(url);
-  const arr = await res.arrayBuffer();
-  // @ts-ignore both contexts provide decodeAudioData
-  return await ctx.decodeAudioData(arr);
-}
+import { useRef } from "react";
 
 export default function ProPage() {
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const [trackUrl] = useLocalStorage<string | null>("studioLastUrlV1", "/audio/sample-beat.mp3");
+
+  return (
+    <main className="mx-auto max-w-6xl px-6 py-8 space-y-6">
+      <h1 className="text-2xl font-bold">Pro</h1>
+
+      {/* Optional effects rack (placeholder component) */}
+      <EffectsRack />
+
+      {/* Visualizer expects an AnalyserNode; it’s fine to render placeholder for now */}
+      <div className="rounded-xl border p-4">
+        <div className="text-sm text-neutral-400 mb-2">Track: {trackUrl ?? "—"}</div>
+        <Visualizer analyser={analyserRef} />
+      </div>
+    </main>
+  );
+}
+
   // ---------- persisted UI state ----------
   const [masterVol, setMasterVol] = useLocalStorage<number>(
     "musiqProMasterV1",
