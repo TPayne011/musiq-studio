@@ -1,4 +1,3 @@
-// src/lib/metadata.ts
 export type NftMetadata = {
   name: string;
   description?: string;
@@ -14,7 +13,7 @@ export function buildTrackMetadata(params: {
   title: string;
   artist: string;
   tags: string[];
-  audioUrl: string; // HTTPS on your domain (Option A)
+  audioUrl: string;
   coverUrl?: string;
   bpm?: number;
   key?: string;
@@ -24,7 +23,7 @@ export function buildTrackMetadata(params: {
     params;
   return {
     name: `${title} — ${artist}`,
-    description: `Track minted via musiq-studio on Pi.`,
+    description: "Track minted via musiq-studio on Pi.",
     image: coverUrl,
     animation_url: audioUrl,
     attributes: [

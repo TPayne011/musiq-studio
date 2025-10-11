@@ -1,4 +1,3 @@
-// src/app/studio/wireframe/page.tsx
 import PiWireframes from "@/components/PiWireframes";
 
 export default function StudioWireframePage() {
