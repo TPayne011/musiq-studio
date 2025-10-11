@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Visualizer from "../../components/Visualizer";
 
 type Props = {
   /** Pass the *ref object* you created: analyserRef */
