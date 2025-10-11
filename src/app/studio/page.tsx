@@ -4,6 +4,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocalStorage } from "@/lib/useLocalStorage";
 import Visualizer from "../components/Visualizer";
+import PiWireframes from "@/components/PiWireframes";
+import { redirect } from "next/navigation";
 
 function formatTime(sec: number | null | undefined) {
   if (!sec || !isFinite(sec)) return "0:00";
