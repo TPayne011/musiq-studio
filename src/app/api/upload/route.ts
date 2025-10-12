@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export const runtime = "nodejs"; // ensure Node runtime
+export const runtime = "nodejs";
 
 function serverClient() {
-  const url = process.env.SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE!;
-  return createClient(url, key, { auth: { persistSession: false } });
+  return createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE!,
+    { auth: { persistSession: false } }
+  );
 }
 
 function safeName(name: string) {
@@ -36,11 +38,10 @@ export async function POST(req: NextRequest) {
     if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // We’ll serve via our own domain at /media/<key>
     const url = `${
       process.env.NEXT_PUBLIC_BASE_URL ?? ""
     }/media/${encodeURIComponent(key)}`;
-    return NextResponse.json({ key, url }); // url is on YOUR domain
+    return NextResponse.json({ key, url });
   } catch (e: any) {
     return NextResponse.json(
       { error: e?.message ?? "Upload failed" },

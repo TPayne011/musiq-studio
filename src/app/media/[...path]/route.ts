@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+
 export const runtime = "nodejs";
 
 function serverClient() {
   return createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE!,
-    {
-      auth: { persistSession: false },
-    }
+    { auth: { persistSession: false } }
   );
 }
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: { path: string[] } }
@@ -20,6 +20,7 @@ export async function GET(
   const { data, error } = await supabase.storage
     .from(process.env.SUPABASE_BUCKET!)
     .download(key);
+
   if (error || !data) return new NextResponse("Not found", { status: 404 });
 
   const ct = key.endsWith(".json")

@@ -22,6 +22,11 @@ export default function ProPage() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mGainRef = useRef<GainNode | null>(null);
 
+  // ensure MediaElementAudioSourceNode is created ONCE per element
+  const src1Ref = useRef<MediaElementAudioSourceNode | null>(null);
+  const src2Ref = useRef<MediaElementAudioSourceNode | null>(null);
+  const didInitRef = useRef(false);
+
   const [ctxUnlocked, setCtxUnlocked] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
@@ -61,6 +66,10 @@ export default function ProPage() {
 
   // Build simple master graph: audio1+audio2 -> master gain -> analyser -> destination
   useEffect(() => {
+    // prevent double init in React Strict Mode (dev)
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+
     ensureCtx();
     const ctx = ctxRef.current;
     const el1 = audioRef1.current;
@@ -75,22 +84,46 @@ export default function ProPage() {
     analyser.fftSize = 2048;
     analyserRef.current = analyser;
 
-    const src1 = new MediaElementAudioSourceNode(ctx, { mediaElement: el1 });
-    const src2 = new MediaElementAudioSourceNode(ctx, { mediaElement: el2 });
+    // Create MediaElementAudioSourceNode ONCE per element
+    if (!src1Ref.current) {
+      src1Ref.current = new MediaElementAudioSourceNode(ctx, {
+        mediaElement: el1,
+      });
+    }
+    if (!src2Ref.current) {
+      src2Ref.current = new MediaElementAudioSourceNode(ctx, {
+        mediaElement: el2,
+      });
+    }
 
-    src1.connect(mGain);
-    src2.connect(mGain);
+    // (re)wire safely
+    try {
+      src1Ref.current.disconnect();
+    } catch {}
+    try {
+      src2Ref.current.disconnect();
+    } catch {}
+    try {
+      analyser.disconnect();
+    } catch {}
+    try {
+      mGain.disconnect();
+    } catch {}
+
+    src1Ref.current.connect(mGain);
+    src2Ref.current.connect(mGain);
     mGain.connect(analyser);
     analyser.connect(ctx.destination);
 
     setIsReady(true);
 
     return () => {
+      // only disconnect; never recreate or close context here
       try {
-        src1.disconnect();
+        src1Ref.current?.disconnect();
       } catch {}
       try {
-        src2.disconnect();
+        src2Ref.current?.disconnect();
       } catch {}
       try {
         analyser.disconnect();
@@ -137,8 +170,9 @@ export default function ProPage() {
 
   function play1() {
     ensureCtx();
-    ctxRef.current?.resume().catch(() => {});
-    audioRef1.current?.play().catch(() => {});
+    ctxRef.current?.resume().finally(() => {
+      audioRef1.current?.play().catch(() => {});
+    });
   }
   function pause1() {
     audioRef1.current?.pause();
@@ -149,10 +183,12 @@ export default function ProPage() {
     el.pause();
     el.currentTime = 0;
   }
+
   function play2() {
     ensureCtx();
-    ctxRef.current?.resume().catch(() => {});
-    audioRef2.current?.play().catch(() => {});
+    ctxRef.current?.resume().finally(() => {
+      audioRef2.current?.play().catch(() => {});
+    });
   }
   function pause2() {
     audioRef2.current?.pause();
@@ -252,14 +288,14 @@ export default function ProPage() {
           </button>
         </div>
 
+        {/* Track 1 player (NO <source> tag, use src prop) */}
         <audio
           ref={audioRef1}
           controls
           preload="metadata"
           className="w-full mt-2"
-        >
-          <source src={track1Url ?? ""} type="audio/mpeg" />
-        </audio>
+          src={track1Url ?? undefined}
+        />
         <div className="text-sm text-neutral-400">
           {fmt(t1Time)} / {fmt(t1Dur)}
         </div>
@@ -315,14 +351,14 @@ export default function ProPage() {
           </button>
         </div>
 
+        {/* Track 2 player (NO <source> tag, use src prop) */}
         <audio
           ref={audioRef2}
           controls
           preload="metadata"
           className="w-full mt-2"
-        >
-          <source src={track2Url ?? ""} type="audio/mpeg" />
-        </audio>
+          src={track2Url ?? undefined}
+        />
         <div className="text-sm text-neutral-400">
           {fmt(t2Time)} / {fmt(t2Dur)}
         </div>

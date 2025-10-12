@@ -5,6 +5,14 @@ import { useState } from "react";
 import { uploadBlobAsFile } from "@/lib/upload";
 import { buildTrackMetadata, type NftMetadata } from "@/lib/metadata";
 
+function extFromType(t: string) {
+  if (t === "audio/mpeg") return ".mp3";
+  if (t === "audio/wav" || t === "audio/x-wav") return ".wav";
+  if (t === "audio/ogg") return ".ogg";
+  if (t === "audio/webm") return ".webm";
+  return "";
+}
+
 export default function MintPage() {
   const [status, setStatus] = useState<
     "idle" | "uploading" | "meta" | "minting" | "done" | "error"
@@ -29,13 +37,19 @@ export default function MintPage() {
       .filter(Boolean);
 
     try {
+      // 1) Upload audio
       setStatus("uploading");
       setMsg("Uploading audio to storage…");
+      const audioExt =
+        extFromType(selectedFile.type) ||
+        selectedFile.name.match(/\.[^.]+$/)?.[0] ||
+        ".bin";
       const audioUrl = await uploadBlobAsFile(
         selectedFile,
-        `${title.replace(/\s+/g, "-")}.webm`
+        `${title.replace(/\s+/g, "-")}${audioExt}`
       );
 
+      // 2) Build + upload metadata JSON
       setStatus("meta");
       setMsg("Building + uploading metadata…");
       const meta: NftMetadata = buildTrackMetadata({
@@ -52,15 +66,22 @@ export default function MintPage() {
         `${title.replace(/\s+/g, "-")}.json`
       );
 
+      // 3) Server mint (stub) — replace later with Pi SDK verification
       setStatus("minting");
-      setMsg("Submitting mint transaction (mock) …");
-      // TODO: replace with Pi SDK mint call using metadataURI = metaUrl
-      await new Promise((r) => setTimeout(r, 700));
-      const fakeTokenId = `pi-demo-${Date.now()}`;
+      setMsg("Submitting mint…");
+      const res = await fetch("/api/mint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metadataUrl: metaUrl, title, tags }),
+      });
+      if (!res.ok) throw new Error(`Mint failed (${res.status})`);
+      const { tokenId, txId } = await res.json();
 
       setStatus("done");
       setMsg(
-        `Minted! tokenId=${fakeTokenId}\nmetadata=${metaUrl}\npreview=${metaUrl}`
+        `Minted!\nToken: ${tokenId}\nTx: ${
+          txId ?? "mock"
+        }\nMetadata: ${metaUrl}\nAudio: ${audioUrl}`
       );
     } catch (e: any) {
       setStatus("error");
