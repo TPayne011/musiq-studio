@@ -6,6 +6,7 @@ import { useLocalStorage } from "@/lib/useLocalStorage";
 import Visualizer from "@/components/Visualizer";
 import PiWireframes from "@/components/PiWireframes";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 function formatTime(sec: number | null | undefined) {
   if (!sec || !isFinite(sec)) return "0:00";
@@ -276,6 +277,15 @@ export default function StudioPage() {
 
         {/* Visualizer */}
         <Visualizer analyser={analyserRef} />
+        {/* Mint CTA */}
+        <div className="pt-4">
+          <Link
+            href="/studio/mint"
+            className="inline-block rounded bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-500 transition-colors"
+          >
+            🎵 Mint This Track
+          </Link>
+        </div>
       </section>
 
       <div className="text-xs text-gray-500">

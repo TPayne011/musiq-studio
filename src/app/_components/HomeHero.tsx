@@ -60,7 +60,7 @@ export default function HomeHero() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, delay: 0.15 }}
-          className="mt-8 flex justify-center gap-4"
+          className="mt-8 flex flex-wrap justify-center gap-4"
         >
           <Link
             href="/studio"
@@ -68,6 +68,14 @@ export default function HomeHero() {
           >
             Enter Studio
           </Link>
+
+          <Link
+            href="/studio/mint"
+            className="rounded-xl bg-gradient-to-r from-indigo-500/80 to-purple-500/80 px-6 py-3 font-medium shadow-[0_0_30px_rgba(99,102,241,.35)] hover:shadow-[0_0_40px_rgba(99,102,241,.55)]"
+          >
+            🎧 Mint Your Track
+          </Link>
+
           <Link
             href="/about"
             className="rounded-xl bg-gradient-to-r from-fuchsia-500/80 to-indigo-500/80 px-6 py-3 font-medium shadow-[0_0_30px_rgba(168,85,247,.35)] hover:shadow-[0_0_40px_rgba(168,85,247,.55)]"
