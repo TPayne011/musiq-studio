@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { uploadBlobAsFile } from "@/lib/upload";
 import { buildTrackMetadata, type NftMetadata } from "@/lib/metadata";
+import { ensurePiAuth, createPiPayment } from "@/lib/pi";
 
 function extFromType(t: string) {
   if (t === "audio/mpeg") return ".mp3";
@@ -66,22 +67,53 @@ export default function MintPage() {
         `${title.replace(/\s+/g, "-")}.json`
       );
 
-      // 3) Server mint (stub) — replace later with Pi SDK verification
+      // 3) Pi auth + payment (with base 5–10 π + 2 π fee)
       setStatus("minting");
-      setMsg("Submitting mint…");
-      const res = await fetch("/api/mint", {
+      setMsg("Authenticating with Pi…");
+      await ensurePiAuth();
+
+      const baseCost = Math.floor(Math.random() * 6) + 5; // 5–10 π
+      const mintingFee = 2;
+      const totalCost = baseCost + mintingFee;
+
+      setMsg(`Creating Pi payment… (${totalCost} π)`);
+      const payment = await createPiPayment({
+        amount: totalCost,
+        memo: `Mint: ${title} (${totalCost} π total, includes ${mintingFee} π fee)`,
+        metadata: {
+          purpose: "mint",
+          title,
+          tags,
+          metadataUrl: metaUrl,
+          baseCost,
+          mintingFee,
+        },
+      });
+
+      // 4) Record the mint server-side (stub ok)
+      const rec = await fetch("/api/mint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ metadataUrl: metaUrl, title, tags }),
+        body: JSON.stringify({
+          metadataUrl: metaUrl,
+          title,
+          tags,
+          piPaymentId: payment?.identifier ?? null,
+          amount: totalCost,
+          mintingFee,
+        }),
       });
-      if (!res.ok) throw new Error(`Mint failed (${res.status})`);
-      const { tokenId, txId } = await res.json();
+      if (!rec.ok) throw new Error(`Mint record failed (${rec.status})`);
+      const { tokenId, txId } = await rec.json();
 
       setStatus("done");
       setMsg(
-        `Minted!\nToken: ${tokenId}\nTx: ${
-          txId ?? "mock"
-        }\nMetadata: ${metaUrl}\nAudio: ${audioUrl}`
+        `✅ Minted!\n` +
+          `Token: ${tokenId}\n` +
+          `Tx: ${txId ?? "pending"}\n` +
+          `Metadata: ${metaUrl}\n` +
+          `Cost: ${baseCost} π + ${mintingFee} π = ${totalCost} π\n` +
+          `Payment: ${payment?.identifier ?? "created"}`
       );
     } catch (e: any) {
       setStatus("error");
