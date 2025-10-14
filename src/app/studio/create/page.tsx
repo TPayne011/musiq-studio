@@ -1,12 +1,9 @@
-// src/app/studio/page.tsx
+// src/app/studio/create/page.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useLocalStorage } from "@/lib/useLocalStorage";
-import Visualizer from "@/components/Visualizer";
-import PiWireframes from "@/components/PiWireframes";
-import { redirect } from "next/navigation";
-import Link from "next/link";
+import { useLocalStorage } from "@/lib/useLocalStorage"; // keep your existing hook
+import Visualizer from "@/components/Visualizer"; // adjust if your path differs
 
 function formatTime(sec: number | null | undefined) {
   if (!sec || !isFinite(sec)) return "0:00";
@@ -16,7 +13,7 @@ function formatTime(sec: number | null | undefined) {
   return `${m}:${r.toString().padStart(2, "0")}`;
 }
 
-export default function StudioPage() {
+export default function StudioCreatePage() {
   // Persist last selected track
   const [trackUrl, setTrackUrl] = useLocalStorage<string | null>(
     "studioLastUrlV1",
@@ -42,7 +39,6 @@ export default function StudioPage() {
   const [duration, setDuration] = useState<number | null>(null);
   const [displayName, setDisplayName] = useState<string>("sample-beat.mp3");
 
-  // Create or reuse an AudioContext safely
   function ensureContext() {
     const AC =
       (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -52,7 +48,6 @@ export default function StudioPage() {
     }
   }
 
-  // Manual unlock (for mobile/autoplay policies)
   async function unlockAudio() {
     ensureContext();
     const ctx = audioCtxRef.current;
@@ -63,28 +58,24 @@ export default function StudioPage() {
     setCtxUnlocked(true);
   }
 
-  // Build Web Audio graph once, reuse nodes
   useEffect(() => {
     ensureContext();
     const ctx = audioCtxRef.current!;
     const el = audioRef.current;
     if (!ctx || !el) return;
 
-    // Create analyser once
     if (!analyserRef.current) {
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 2048;
       analyserRef.current = analyser;
     }
 
-    // Create media source once (avoid double-wrap error)
     if (!mediaSrcRef.current) {
       mediaSrcRef.current = new MediaElementAudioSourceNode(ctx, {
         mediaElement: el,
       });
     }
 
-    // Safe (re)wire: src -> analyser -> destination
     try {
       mediaSrcRef.current.disconnect();
     } catch {}
@@ -97,7 +88,6 @@ export default function StudioPage() {
 
     setIsReady(true);
 
-    // Cleanup: disconnect only; don't close context
     return () => {
       try {
         mediaSrcRef.current?.disconnect();
@@ -106,16 +96,13 @@ export default function StudioPage() {
         analyserRef.current?.disconnect();
       } catch {}
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keep <audio> element in sync with persisted URL + set display name
   useEffect(() => {
     const el = audioRef.current;
     if (!el || !trackUrl) return;
     el.src = trackUrl;
     el.load();
-    // display name
     if (trackUrl.startsWith("blob:")) {
       setDisplayName("Local upload");
     } else {
@@ -124,21 +111,18 @@ export default function StudioPage() {
         const last = u.pathname.split("/").filter(Boolean).pop();
         setDisplayName(last ?? trackUrl);
       } catch {
-        // plain path like /audio/foo.mp3 or bare string
         const last = trackUrl.split("/").filter(Boolean).pop();
         setDisplayName(last ?? trackUrl);
       }
     }
   }, [trackUrl]);
 
-  // Attach media events for Now Playing (time + duration + status)
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
 
-    const onLoaded = () => {
+    const onLoaded = () =>
       setDuration(isFinite(el.duration) ? el.duration : null);
-    };
     const onTime = () => setCurrentTime(el.currentTime || 0);
     const onPlay = () => setStatus("playing");
     const onPause = () => setStatus("paused");
@@ -162,7 +146,6 @@ export default function StudioPage() {
     };
   }, []);
 
-  // Upload from computer
   function handleUpload(file: File | null) {
     if (!file) return;
     if (blobUrlRef.current) {
@@ -174,7 +157,6 @@ export default function StudioPage() {
     setTrackUrl(url);
   }
 
-  // Transport
   function play() {
     ensureContext();
     audioCtxRef.current?.resume().catch(() => {});
@@ -229,7 +211,6 @@ export default function StudioPage() {
           preload="metadata"
           style={{ width: "100%" }}
         >
-          {/* Fallback for very old browsers */}
           <source src={trackUrl ?? ""} type="audio/mpeg" />
           Your browser does not support the audio element.
         </audio>
@@ -277,15 +258,6 @@ export default function StudioPage() {
 
         {/* Visualizer */}
         <Visualizer analyser={analyserRef} />
-        {/* Mint CTA */}
-        <div className="pt-4">
-          <Link
-            href="/studio/mint"
-            className="inline-block rounded bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-500 transition-colors"
-          >
-            🎵 Mint This Track
-          </Link>
-        </div>
       </section>
 
       <div className="text-xs text-gray-500">

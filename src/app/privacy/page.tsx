@@ -1,79 +1,84 @@
 export default function PrivacyPage() {
   return (
-    <main className="mx-auto max-w-3xl px-4 py-12 space-y-6">
-      <h1 className="text-3xl font-bold">Privacy Policy</h1>
-      <p className="text-gray-700">
-        This Privacy Policy explains how Musiq-Studio (“we”, “our”, “us”)
-        collects, uses, and shares information when you use our website and
-        features (the “Service”).
-      </p>
-
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Information We Collect</h2>
-        <ul className="list-disc pl-6 text-gray-700 space-y-1">
-          <li>
-            <strong>Account & contact info</strong> (if you choose to provide
-            it).
-          </li>
-          <li>
-            <strong>Usage data</strong> (pages visited, basic analytics).
-          </li>
-          <li>
-            <strong>Local files</strong> you load into the Studio stay on your
-            device; we do not upload them.
-          </li>
-        </ul>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">How We Use Information</h2>
-        <ul className="list-disc pl-6 text-gray-700 space-y-1">
-          <li>To operate and improve the Service.</li>
-          <li>To communicate with you about updates or support.</li>
-          <li>To protect the Service from misuse or abuse.</li>
-        </ul>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Sharing</h2>
-        <p className="text-gray-700">
-          We do not sell your personal information. We may share limited data
-          with service providers who help us run the Service (subject to
-          confidentiality).
+    <main className="legal-page">
+      <div className="card space-y-6">
+        <h1>Musiq Studio on Pi — Privacy Policy</h1>
+        <p>
+          This Privacy Policy explains how Musiq Studio on Pi (“we”, “our”,
+          “us”) collects, uses, and protects your information when you use our
+          platform and related services (the “Service”). Musiq Studio operates
+          within the Pi Network ecosystem and follows Pi Network’s privacy and
+          data handling standards.
         </p>
-      </section>
 
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Data Retention</h2>
-        <p className="text-gray-700">
-          We retain information only as long as necessary for the purposes
-          above. Local audio you load in the Studio is not uploaded and does not
-          leave your device.
+        <section className="space-y-3">
+          <h2>Information We Collect</h2>
+          <ul>
+            <li>
+              <strong>Pi Network Account Info</strong> – Your basic Pioneer
+              profile (username, wallet ID) is used for authentication and
+              transaction verification through the official Pi SDK.
+            </li>
+            <li>
+              <strong>Uploaded Media</strong> – Audio files and metadata you
+              upload when minting NFTs are stored securely in Supabase storage.
+            </li>
+            <li>
+              <strong>Usage Data</strong> – Basic app analytics and performance
+              logs to improve stability and user experience.
+            </li>
+          </ul>
+        </section>
+
+        <section className="space-y-3">
+          <h2>How We Use Information</h2>
+          <ul>
+            <li>To enable track uploads, NFT minting, and playback.</li>
+            <li>To verify transactions via Pi Network’s blockchain APIs.</li>
+            <li>To enhance app reliability and improve creator tools.</li>
+          </ul>
+        </section>
+
+        <section className="space-y-3">
+          <h2>Sharing</h2>
+          <p>
+            We never sell your personal information. Limited technical data may
+            be shared with service providers like Supabase or Pi Network solely
+            to enable authentication, uploads, and minting features.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2>Data Retention</h2>
+          <p>
+            Uploaded media and metadata remain stored for as long as your
+            account is active. You may request deletion of specific assets or
+            data by contacting our support team.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2>Your Rights</h2>
+          <ul>
+            <li>Request access, export, or deletion of your data.</li>
+            <li>
+              Control analytics and cookie preferences via browser settings.
+            </li>
+          </ul>
+        </section>
+
+        <section className="space-y-3">
+          <h2>Contact</h2>
+          <p>
+            Questions or privacy concerns? Contact us at{" "}
+            <a href="mailto:support@musiq.studio">support@musiq.studio</a>.
+          </p>
+        </section>
+
+        <p className="text-xs text-neutral-500">
+          Last updated: {new Date().toLocaleDateString()} · Musiq Studio on Pi
         </p>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Your Choices</h2>
-        <ul className="list-disc pl-6 text-gray-700 space-y-1">
-          <li>You can request access or deletion of your account data.</li>
-          <li>You can control cookies/analytics via your browser settings.</li>
-        </ul>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Contact</h2>
-        <p className="text-gray-700">
-          Questions? Contact us at{" "}
-          <a className="underline" href="mailto:support@musiq.studio">
-            support@musiq.studio
-          </a>
-          .
-        </p>
-      </section>
-
-      <p className="text-xs text-gray-500">
-        Last updated: {new Date().toLocaleDateString()}
-      </p>
+      </div>
     </main>
   );
 }
