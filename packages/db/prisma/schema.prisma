@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"   // change to "sqlite" if not using Docker today
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  username      String?
+  avatarUrl     String?
+  createdAt     DateTime @default(now())
+  tracks        Track[]
+  sales         Sale[]     // sales where this user is the seller
+  collaborators Collaboration[]
+}
+
+model Track {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  audioUrl      String
+  coverUrl      String?
+  priceCents    Int      @default(0)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  createdAt     DateTime @default(now())
+  sales         Sale[]
+  collaborators Collaboration[]
+}
+
+model Sale {
+  id            String   @id @default(cuid())
+  trackId       String
+  track         Track    @relation(fields: [trackId], references: [id])
+
+  sellerId      String
+  seller        User     @relation(fields: [sellerId], references: [id])
+
+  buyerEmail    String
+  amountCents   Int
+  createdAt     DateTime @default(now())
+}
+
+model Collaboration {
+  id            String   @id @default(cuid())
+  userId        String
+  trackId       String
+  splitPercent  Int
+  user          User     @relation(fields: [userId], references: [id])
+  track         Track    @relation(fields: [trackId], references: [id])
+}
