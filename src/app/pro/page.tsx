@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Visualizer from "@/components/Visualizer";
-import EffectsRack from "@/components/EffectsRack"; // remove if not needed
+import EffectsRack from "@/components/EffectsRack";
 import { useLocalStorage } from "@/lib/useLocalStorage";
 
 function fmt(sec?: number | null) {
@@ -64,9 +64,23 @@ export default function ProPage() {
     setCtxUnlocked(true);
   }
 
+  // ✅ NEW: ensure master gain → analyser → destination is connected
+  function ensureLink() {
+    const ctx = ctxRef.current;
+    const mg = mGainRef.current;
+    const an = analyserRef.current;
+    if (!ctx || !mg || !an) return;
+
+    try {
+      mg.disconnect();
+      an.disconnect();
+      mg.connect(an);
+      an.connect(ctx.destination);
+    } catch {}
+  }
+
   // Build simple master graph: audio1+audio2 -> master gain -> analyser -> destination
   useEffect(() => {
-    // prevent double init in React Strict Mode (dev)
     if (didInitRef.current) return;
     didInitRef.current = true;
 
@@ -84,7 +98,6 @@ export default function ProPage() {
     analyser.fftSize = 2048;
     analyserRef.current = analyser;
 
-    // Create MediaElementAudioSourceNode ONCE per element
     if (!src1Ref.current) {
       src1Ref.current = new MediaElementAudioSourceNode(ctx, {
         mediaElement: el1,
@@ -96,20 +109,6 @@ export default function ProPage() {
       });
     }
 
-    // (re)wire safely
-    try {
-      src1Ref.current.disconnect();
-    } catch {}
-    try {
-      src2Ref.current.disconnect();
-    } catch {}
-    try {
-      analyser.disconnect();
-    } catch {}
-    try {
-      mGain.disconnect();
-    } catch {}
-
     src1Ref.current.connect(mGain);
     src2Ref.current.connect(mGain);
     mGain.connect(analyser);
@@ -118,21 +117,13 @@ export default function ProPage() {
     setIsReady(true);
 
     return () => {
-      // only disconnect; never recreate or close context here
       try {
         src1Ref.current?.disconnect();
-      } catch {}
-      try {
         src2Ref.current?.disconnect();
-      } catch {}
-      try {
         analyser.disconnect();
-      } catch {}
-      try {
         mGain.disconnect();
       } catch {}
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // reflect master volume
@@ -142,7 +133,7 @@ export default function ProPage() {
     }
   }, [masterVol]);
 
-  // attach media events for both players
+  // attach media events
   useEffect(() => {
     const el1 = audioRef1.current,
       el2 = audioRef2.current;
@@ -168,10 +159,56 @@ export default function ProPage() {
     };
   }, []);
 
+  // ✅ NEW: reload tracks when URL changes
+  useEffect(() => {
+    if (audioRef1.current && track1Url) {
+      audioRef1.current.src = track1Url;
+      audioRef1.current.load();
+    }
+  }, [track1Url]);
+
+  useEffect(() => {
+    if (audioRef2.current && track2Url) {
+      audioRef2.current.src = track2Url;
+      audioRef2.current.load();
+    }
+  }, [track2Url]);
+
+  // ✅ NEW: auto-resume + ensure link on native play
+  useEffect(() => {
+    const ctx = ctxRef.current;
+    const el1 = audioRef1.current;
+    const el2 = audioRef2.current;
+    if (!ctx || !el1 || !el2) return;
+
+    const onPlay = () => {
+      ensureLink();
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      el1.muted = false;
+      el2.muted = false;
+      el1.volume = 1;
+      el2.volume = 1;
+    };
+
+    el1.addEventListener("play", onPlay);
+    el2.addEventListener("play", onPlay);
+
+    return () => {
+      el1.removeEventListener("play", onPlay);
+      el2.removeEventListener("play", onPlay);
+    };
+  }, []);
+
+  // 🔊 updated play handlers
   function play1() {
     ensureCtx();
+    ensureLink();
     ctxRef.current?.resume().finally(() => {
-      audioRef1.current?.play().catch(() => {});
+      if (audioRef1.current) {
+        audioRef1.current.muted = false;
+        audioRef1.current.volume = 1;
+        audioRef1.current.play().catch(() => {});
+      }
     });
   }
   function pause1() {
@@ -186,8 +223,13 @@ export default function ProPage() {
 
   function play2() {
     ensureCtx();
+    ensureLink();
     ctxRef.current?.resume().finally(() => {
-      audioRef2.current?.play().catch(() => {});
+      if (audioRef2.current) {
+        audioRef2.current.muted = false;
+        audioRef2.current.volume = 1;
+        audioRef2.current.play().catch(() => {});
+      }
     });
   }
   function pause2() {
@@ -263,21 +305,13 @@ export default function ProPage() {
               className="hidden"
             />
           </label>
-          <button
-            className="btn-primary"
-            onClick={play1}
-            disabled={!isReady || !track1Url}
-          >
+          <button className="btn-primary" onClick={play1} disabled={!isReady}>
             Play
           </button>
-          <button
-            className="btn-secondary"
-            onClick={pause1}
-            disabled={!isReady}
-          >
+          <button className="btn-secondary" onClick={pause1}>
             Pause
           </button>
-          <button className="btn-secondary" onClick={stop1} disabled={!isReady}>
+          <button className="btn-secondary" onClick={stop1}>
             Stop
           </button>
           <button
@@ -288,11 +322,11 @@ export default function ProPage() {
           </button>
         </div>
 
-        {/* Track 1 player (NO <source> tag, use src prop) */}
         <audio
           ref={audioRef1}
           controls
           preload="metadata"
+          crossOrigin="anonymous"
           className="w-full mt-2"
           src={track1Url ?? undefined}
         />
@@ -326,21 +360,13 @@ export default function ProPage() {
               className="hidden"
             />
           </label>
-          <button
-            className="btn-primary"
-            onClick={play2}
-            disabled={!isReady || !track2Url}
-          >
+          <button className="btn-primary" onClick={play2} disabled={!isReady}>
             Play
           </button>
-          <button
-            className="btn-secondary"
-            onClick={pause2}
-            disabled={!isReady}
-          >
+          <button className="btn-secondary" onClick={pause2}>
             Pause
           </button>
-          <button className="btn-secondary" onClick={stop2} disabled={!isReady}>
+          <button className="btn-secondary" onClick={stop2}>
             Stop
           </button>
           <button
@@ -351,11 +377,11 @@ export default function ProPage() {
           </button>
         </div>
 
-        {/* Track 2 player (NO <source> tag, use src prop) */}
         <audio
           ref={audioRef2}
           controls
           preload="metadata"
+          crossOrigin="anonymous"
           className="w-full mt-2"
           src={track2Url ?? undefined}
         />
@@ -364,8 +390,12 @@ export default function ProPage() {
         </div>
       </div>
 
-      {/* Effects (optional placeholder component) */}
-      <EffectsRack />
+      {/* ✅ Effects Rack (now wired properly) */}
+      <EffectsRack
+        ctxRef={ctxRef}
+        inputRef={mGainRef}
+        outputRef={analyserRef}
+      />
     </main>
   );
 }
