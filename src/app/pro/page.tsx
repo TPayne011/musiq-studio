@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Visualizer from "@/components/Visualizer";
 import EffectsRack from "@/components/EffectsRack";
 import { useLocalStorage } from "@/lib/useLocalStorage";
@@ -15,6 +16,8 @@ function fmt(sec?: number | null) {
 }
 
 export default function ProPage() {
+  const router = useRouter();
+
   // ----- Audio graph (master + analyser) -----
   const audioRef1 = useRef<HTMLAudioElement | null>(null);
   const audioRef2 = useRef<HTMLAudioElement | null>(null);
@@ -22,7 +25,6 @@ export default function ProPage() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mGainRef = useRef<GainNode | null>(null);
 
-  // ensure MediaElementAudioSourceNode is created ONCE per element
   const src1Ref = useRef<MediaElementAudioSourceNode | null>(null);
   const src2Ref = useRef<MediaElementAudioSourceNode | null>(null);
   const didInitRef = useRef(false);
@@ -30,7 +32,7 @@ export default function ProPage() {
   const [ctxUnlocked, setCtxUnlocked] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
-  // track URLs (persist 1, live 2)
+  // track URLs
   const [track1Url, setTrack1Url] = useLocalStorage<string | null>(
     "proTrack1Url",
     "/audio/sample-beat.mp3"
@@ -43,8 +45,18 @@ export default function ProPage() {
   const [t1Dur, setT1Dur] = useState<number | null>(null);
   const [t2Dur, setT2Dur] = useState<number | null>(null);
 
-  // master UI
+  // master
   const [masterVol, setMasterVol] = useState(80);
+
+  // titles + save states
+  const [title1, setTitle1] = useState("Deck A");
+  const [title2, setTitle2] = useState("Deck B");
+  const [saving1, setSaving1] = useState(false);
+  const [saving2, setSaving2] = useState(false);
+  const [prog1, setProg1] = useState(0);
+  const [prog2, setProg2] = useState(0);
+  const [msg1, setMsg1] = useState("");
+  const [msg2, setMsg2] = useState("");
 
   function ensureCtx() {
     const AC =
@@ -64,13 +76,11 @@ export default function ProPage() {
     setCtxUnlocked(true);
   }
 
-  // ✅ NEW: ensure master gain → analyser → destination is connected
   function ensureLink() {
     const ctx = ctxRef.current;
     const mg = mGainRef.current;
     const an = analyserRef.current;
     if (!ctx || !mg || !an) return;
-
     try {
       mg.disconnect();
       an.disconnect();
@@ -79,7 +89,7 @@ export default function ProPage() {
     } catch {}
   }
 
-  // Build simple master graph: audio1+audio2 -> master gain -> analyser -> destination
+  // Build master graph
   useEffect(() => {
     if (didInitRef.current) return;
     didInitRef.current = true;
@@ -98,16 +108,14 @@ export default function ProPage() {
     analyser.fftSize = 2048;
     analyserRef.current = analyser;
 
-    if (!src1Ref.current) {
+    if (!src1Ref.current)
       src1Ref.current = new MediaElementAudioSourceNode(ctx, {
         mediaElement: el1,
       });
-    }
-    if (!src2Ref.current) {
+    if (!src2Ref.current)
       src2Ref.current = new MediaElementAudioSourceNode(ctx, {
         mediaElement: el2,
       });
-    }
 
     src1Ref.current.connect(mGain);
     src2Ref.current.connect(mGain);
@@ -126,14 +134,13 @@ export default function ProPage() {
     };
   }, []);
 
-  // reflect master volume
   useEffect(() => {
     if (mGainRef.current) {
       mGainRef.current.gain.value = masterVol / 100;
     }
   }, [masterVol]);
 
-  // attach media events
+  // media events
   useEffect(() => {
     const el1 = audioRef1.current,
       el2 = audioRef2.current;
@@ -159,14 +166,12 @@ export default function ProPage() {
     };
   }, []);
 
-  // ✅ NEW: reload tracks when URL changes
   useEffect(() => {
     if (audioRef1.current && track1Url) {
       audioRef1.current.src = track1Url;
       audioRef1.current.load();
     }
   }, [track1Url]);
-
   useEffect(() => {
     if (audioRef2.current && track2Url) {
       audioRef2.current.src = track2Url;
@@ -174,32 +179,26 @@ export default function ProPage() {
     }
   }, [track2Url]);
 
-  // ✅ NEW: auto-resume + ensure link on native play
   useEffect(() => {
     const ctx = ctxRef.current;
     const el1 = audioRef1.current;
     const el2 = audioRef2.current;
     if (!ctx || !el1 || !el2) return;
-
     const onPlay = () => {
       ensureLink();
       if (ctx.state === "suspended") ctx.resume().catch(() => {});
-      el1.muted = false;
-      el2.muted = false;
-      el1.volume = 1;
-      el2.volume = 1;
+      el1.muted = el2.muted = false;
+      el1.volume = el2.volume = 1;
     };
-
     el1.addEventListener("play", onPlay);
     el2.addEventListener("play", onPlay);
-
     return () => {
       el1.removeEventListener("play", onPlay);
       el2.removeEventListener("play", onPlay);
     };
   }, []);
 
-  // 🔊 updated play handlers
+  // playback
   function play1() {
     ensureCtx();
     ensureLink();
@@ -220,7 +219,6 @@ export default function ProPage() {
     el.pause();
     el.currentTime = 0;
   }
-
   function play2() {
     ensureCtx();
     ensureLink();
@@ -242,9 +240,123 @@ export default function ProPage() {
     el.currentTime = 0;
   }
 
+  // ---------- Upload + Save Helpers ----------
+  async function toFileFromUrl(url: string, fallbackName: string) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+    const blob = await res.blob();
+    const name = (fallbackName || "track").replace(/[^\w.\-]+/g, "_");
+    return new File([blob], name, { type: blob.type || "audio/mpeg" });
+  }
+
+  function toFileFromBlobUrl(blobUrl: string, fallbackName: string) {
+    return fetch(blobUrl)
+      .then((r) => r.blob())
+      .then(
+        (b) =>
+          new File(
+            [b],
+            ((fallbackName || "track") + ".mp3").replace(/[^\w.\-]+/g, "_"),
+            { type: b.type || "audio/mpeg" }
+          )
+      );
+  }
+
+  function getAudioDuration(file: File): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const a = document.createElement("audio");
+      a.preload = "metadata";
+      a.onloadedmetadata = () => {
+        resolve(Math.round(a.duration));
+        URL.revokeObjectURL(a.src);
+      };
+      a.onerror = reject;
+      a.src = URL.createObjectURL(file);
+    });
+  }
+
+  function putWithProgress(
+    url: string,
+    file: File,
+    token: string,
+    onProg: (n: number) => void
+  ) {
+    return new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProg(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () =>
+        xhr.status >= 200 && xhr.status < 300
+          ? resolve()
+          : reject(new Error(`Upload ${xhr.status}`));
+      xhr.onerror = () => reject(new Error("Network error"));
+      xhr.open("PUT", url);
+      xhr.setRequestHeader("authorization", `Bearer ${token}`);
+      xhr.setRequestHeader("x-upsert", "false");
+      xhr.send(file);
+    });
+  }
+
+  async function saveDeck(which: 1 | 2) {
+    const isDeck1 = which === 1;
+    const url = isDeck1 ? track1Url : track2Url;
+    const setSaving = isDeck1 ? setSaving1 : setSaving2;
+    const setProg = isDeck1 ? setProg1 : setProg2;
+    const setMsg = isDeck1 ? setMsg1 : setMsg2;
+    const title =
+      (isDeck1 ? title1 : title2) || (isDeck1 ? "Deck A" : "Deck B");
+
+    try {
+      if (!url) return setMsg("Pick or load a track first.");
+      setSaving(true);
+      setProg(0);
+      setMsg("");
+
+      let file: File;
+      if (url.startsWith("blob:")) file = await toFileFromBlobUrl(url, title);
+      else file = await toFileFromUrl(url, title);
+
+      const signRes = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileName: file.name, bucket: "media" }),
+      });
+      const sign = await signRes.json();
+      if (!signRes.ok) throw new Error(sign.error || "Sign failed");
+
+      await putWithProgress(sign.signedUrl, file, sign.token, setProg);
+
+      const durationSec = await getAudioDuration(file).catch(() => null);
+      const userId = "demo-user-id";
+
+      const saveRes = await fetch("/api/tracks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description: "",
+          publicUrl: sign.publicUrl,
+          storagePath: sign.path,
+          userId,
+          durationSec,
+        }),
+      });
+      const saved = await saveRes.json();
+      if (!saveRes.ok) throw new Error(saved.error || "Save failed");
+
+      setMsg("✅ Saved!");
+      router.push(`/tracks/${saved.track.id}`);
+    } catch (e: any) {
+      setMsg(`❌ ${e.message || "Save error"}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ---------- UI ----------
   return (
     <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      {/* Header */}
       <h1 className="text-2xl font-bold flex items-center justify-between">
         <span>Musiq Pro</span>
         <button
@@ -255,7 +367,6 @@ export default function ProPage() {
         </button>
       </h1>
 
-      {/* Unlock + status */}
       <div className="flex items-center gap-3">
         <button className="btn-secondary" onClick={unlockCtx}>
           🔓 Unlock Audio {ctxUnlocked ? "✓" : ""}
@@ -280,10 +391,17 @@ export default function ProPage() {
         <Visualizer analyser={analyserRef} />
       </div>
 
-      {/* Track 1 */}
+      {/* Deck 1 */}
       <div className="card space-y-3">
-        <h2 className="font-semibold">Track 1</h2>
-        <div className="flex items-center gap-2">
+        <h2 className="font-semibold">Track 1 (Deck A)</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            className="input"
+            value={title1}
+            onChange={(e) => setTitle1(e.target.value)}
+            placeholder="Title for Deck A"
+          />
           <input
             type="text"
             className="input"
@@ -320,6 +438,13 @@ export default function ProPage() {
           >
             Load Sample
           </button>
+          <button
+            className="btn-primary"
+            onClick={() => saveDeck(1)}
+            disabled={!track1Url || saving1}
+          >
+            {saving1 ? `Saving… ${prog1}%` : "Save to Library"}
+          </button>
         </div>
 
         <audio
@@ -331,14 +456,22 @@ export default function ProPage() {
           src={track1Url ?? undefined}
         />
         <div className="text-sm text-neutral-400">
-          {fmt(t1Time)} / {fmt(t1Dur)}
+          {fmt(t1Time)} / {fmt(t1Dur)}{" "}
+          {msg1 && <span className="ml-2">{msg1}</span>}
         </div>
       </div>
 
-      {/* Track 2 */}
+      {/* Deck 2 */}
       <div className="card space-y-3">
-        <h2 className="font-semibold">Track 2</h2>
-        <div className="flex items-center gap-2">
+        <h2 className="font-semibold">Track 2 (Deck B)</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            className="input"
+            value={title2}
+            onChange={(e) => setTitle2(e.target.value)}
+            placeholder="Title for Deck B"
+          />
           <input
             type="text"
             className="input"
@@ -375,6 +508,13 @@ export default function ProPage() {
           >
             Load Sample
           </button>
+          <button
+            className="btn-primary"
+            onClick={() => saveDeck(2)}
+            disabled={!track2Url || saving2}
+          >
+            {saving2 ? `Saving… ${prog2}%` : "Save to Library"}
+          </button>
         </div>
 
         <audio
@@ -386,11 +526,12 @@ export default function ProPage() {
           src={track2Url ?? undefined}
         />
         <div className="text-sm text-neutral-400">
-          {fmt(t2Time)} / {fmt(t2Dur)}
+          {fmt(t2Time)} / {fmt(t2Dur)}{" "}
+          {msg2 && <span className="ml-2">{msg2}</span>}
         </div>
       </div>
 
-      {/* ✅ Effects Rack (now wired properly) */}
+      {/* Effects Rack */}
       <EffectsRack
         ctxRef={ctxRef}
         inputRef={mGainRef}

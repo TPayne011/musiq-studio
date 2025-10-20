@@ -1,50 +1,60 @@
-import { NextRequest, NextResponse } from "next/server";
+// src/app/api/upload/route.ts
+import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-function serverClient() {
-  return createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE!,
-    { auth: { persistSession: false } }
-  );
-}
-
-function safeName(name: string) {
-  return name
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9._-]/g, "");
-}
-
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const form = await req.formData();
-    const file = form.get("file") as File | null;
-    const name = String(form.get("name") || "upload.bin");
-    if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !serviceKey) {
+      return NextResponse.json(
+        {
+          error:
+            "Missing Supabase env: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
+        },
+        { status: 500 }
+      );
+    }
 
-    const supabase = serverClient();
-    const keyBase = safeName(name);
-    const key = `uploads/${Date.now()}-${keyBase}`;
-    const arrayBuffer = await file.arrayBuffer();
-    const contentType = file.type || "application/octet-stream";
+    const { fileName, bucket = "media", upsert = false } = await req.json();
+    // build the path inside that bucket (use your existing folder)
 
-    const { error } = await supabase.storage
-      .from(process.env.SUPABASE_BUCKET!)
-      .upload(key, Buffer.from(arrayBuffer), { contentType, upsert: false });
+    if (!fileName) {
+      return NextResponse.json({ error: "Missing fileName" }, { status: 400 });
+    }
+    // build the path inside that bucket (use your existing folder)
+    const ext = (fileName.split(".").pop() || "mp3").toLowerCase();
+    const path = `uploads/${crypto.randomUUID()}.${ext}`;
 
-    if (error)
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    const supabase = createClient(url, serviceKey, {
+      auth: { persistSession: false },
+    });
 
-    const url = `${
-      process.env.NEXT_PUBLIC_BASE_URL ?? ""
-    }/media/${encodeURIComponent(key)}`;
-    return NextResponse.json({ key, url });
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUploadUrl(path, { upsert });
+
+    if (error || !data) {
+      return NextResponse.json(
+        { error: error?.message || "Failed to create signed URL" },
+        { status: 502 }
+      );
+    }
+
+    const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
+
+    return NextResponse.json({
+      path, // e.g., tracks/<uuid>.mp3
+      signedUrl: data.signedUrl,
+      token: data.token,
+      publicUrl: pub.publicUrl, // works if the bucket is Public
+    });
   } catch (e: any) {
     return NextResponse.json(
-      { error: e?.message ?? "Upload failed" },
+      { error: e?.message || "sign error" },
       { status: 500 }
     );
   }
