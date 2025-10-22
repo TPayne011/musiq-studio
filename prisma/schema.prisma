@@ -26,12 +26,15 @@ model Track {
   id           String   @id @default(cuid())
   title        String
   description  String?
-  publicUrl    String
+  audioUrl     String      // <-- match DB column name
   storagePath  String
+  artworkUrl   String?
   durationSec  Int?
+  waveformJson Json?
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  // Relationship
-  userId  String
-  user    User  @relation(fields: [userId], references: [id])
+  userId String
+  user   User     @relation(fields: [userId], references: [id])
 }
+

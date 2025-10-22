@@ -1,32 +1,34 @@
-import { prisma } from "../../lib/prisma";
+// src/app/tracks/page.tsx
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+import { prisma } from "@/lib/prisma";
+import Link from "next/link";
 
 export default async function TracksPage() {
   const tracks = await prisma.track.findMany({
     orderBy: { createdAt: "desc" },
-    include: { user: true },
+    select: { id: true, title: true, audioUrl: true, createdAt: true },
     take: 50,
   });
 
   return (
-    <main className="max-w-3xl mx-auto p-6 space-y-4">
-      <h1 className="text-2xl font-bold">Tracks</h1>
-      {tracks.length === 0 && (
-        <p>
-          No tracks yet. (Run <code>pnpm db:seed</code>)
-        </p>
-      )}
+    <main className="max-w-4xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-4">Your Library</h1>
       <ul className="space-y-3">
         {tracks.map((t) => (
-          <li key={t.id} className="border rounded p-3">
-            <a className="font-semibold underline" href={`/tracks/${t.id}`}>
-              {t.title}
-            </a>
-            <div className="text-sm opacity-70">
-              by {t.user?.name ?? "Unknown"} ·{" "}
-              {new Date(t.createdAt).toLocaleString()}
+          <li key={t.id} className="rounded border border-white/10 p-3">
+            <div className="font-medium">
+              <Link href={`/tracks/${t.id}`} className="underline">
+                {t.title}
+              </Link>
             </div>
+            <div className="text-xs text-gray-500 break-all">{t.audioUrl}</div>
           </li>
         ))}
+        {tracks.length === 0 && (
+          <li className="text-gray-500">No tracks yet.</li>
+        )}
       </ul>
     </main>
   );
