@@ -1,4 +1,3 @@
-// src/app/api/upload/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -20,12 +19,10 @@ export async function POST(req: Request) {
     }
 
     const { fileName, bucket = "media", upsert = false } = await req.json();
-    // build the path inside that bucket (use your existing folder)
-
     if (!fileName) {
       return NextResponse.json({ error: "Missing fileName" }, { status: 400 });
     }
-    // build the path inside that bucket (use your existing folder)
+
     const ext = (fileName.split(".").pop() || "mp3").toLowerCase();
     const path = `uploads/${crypto.randomUUID()}.${ext}`;
 
@@ -47,10 +44,10 @@ export async function POST(req: Request) {
     const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
 
     return NextResponse.json({
-      path, // e.g., tracks/<uuid>.mp3
+      path, // e.g., uploads/<uuid>.mp3
       signedUrl: data.signedUrl,
       token: data.token,
-      publicUrl: pub.publicUrl, // works if the bucket is Public
+      publicUrl: pub.publicUrl, // works if bucket is Public
     });
   } catch (e: any) {
     return NextResponse.json(

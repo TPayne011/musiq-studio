@@ -228,16 +228,33 @@ export default function StudioPage() {
       xhr.send(file);
     });
   }
+  // Safer fetch → JSON (surfacing HTML errors clearly)
+  async function jsonOrThrow(res: Response, label: string) {
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      const data = await res.json();
+      if (!res.ok)
+        throw new Error(data?.error || `${label} failed (${res.status})`);
+      return data;
+    } else {
+      const text = await res.text();
+      throw new Error(
+        `${label} non-JSON (${res.status}): ${text.slice(0, 200)}`
+      );
+    }
+  }
 
-  // Save to Library (Supabase Storage + Prisma Track)
   async function saveToLibrary() {
     try {
-      if (!trackUrl) return setStatusMsg("Pick or load a track first.");
+      if (!trackUrl) {
+        setStatusMsg("Pick or load a track first.");
+        return;
+      }
       setIsSaving(true);
       setStatusMsg("");
       setUploadPct(0);
 
-      // 1) Build a File from current source
+      // Build file from current source
       let file: File;
       if (trackUrl.startsWith("blob:")) {
         const blob = await (await fetch(trackUrl)).blob();
@@ -245,30 +262,62 @@ export default function StudioPage() {
           type: blob.type || "audio/mpeg",
         });
       } else {
-        const blob = await fetchBlobFromUrl(trackUrl);
-        const guessed = (displayName || "track").replace(/[^\w.\-]+/g, "_");
-        file = new File([blob], guessed, { type: blob.type || "audio/mpeg" });
+        const res = await fetch(trackUrl);
+        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+        const blob = await res.blob();
+        const safeName = (displayName || "track").replace(/[^\w.\-]+/g, "_");
+        file = new File([blob], safeName, { type: blob.type || "audio/mpeg" });
       }
 
-      // 2) Sign upload
+      // 1) Sign upload
       const signRes = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName: file.name, bucket: "media" }),
+        body: JSON.stringify({ fileName: file.name, bucket: "media" }), // <- using 'media'
       });
-      const sign = await signRes.json();
-      if (!signRes.ok) throw new Error(sign.error || "Sign failed");
+      const sign = await jsonOrThrow(signRes, "Upload signer");
 
-      // 3) Upload with progress
-      await putWithProgress(sign.signedUrl, file, sign.token, setUploadPct);
+      // 2) PUT to Storage with progress
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable)
+            setUploadPct(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload = () =>
+          xhr.status >= 200 && xhr.status < 300
+            ? resolve()
+            : reject(new Error(`Upload ${xhr.status}`));
+        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.open("PUT", sign.signedUrl);
+        xhr.setRequestHeader("authorization", `Bearer ${sign.token}`);
+        xhr.setRequestHeader("x-upsert", "false");
+        xhr.send(file);
+      });
 
-      // 4) Duration
-      const durationSec = await getAudioDuration(file).catch(() => null);
+      // 3) Duration (best-effort)
+      const durationSec = await (async () => {
+        try {
+          const tmp = document.createElement("audio");
+          tmp.preload = "metadata";
+          return await new Promise<number>((res, rej) => {
+            tmp.onloadedmetadata = () => {
+              const d = Math.round(tmp.duration);
+              URL.revokeObjectURL(tmp.src);
+              res(d);
+            };
+            tmp.onerror = rej;
+            tmp.src = URL.createObjectURL(file);
+          });
+        } catch {
+          return null;
+        }
+      })();
 
-      // TODO: Replace with real user id once auth is wired
+      // TODO replace demo user when auth lands
       const userId = "demo-user-id";
 
-      // 5) Persist Track
+      // 4) Create DB row
       const saveRes = await fetch("/api/tracks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -281,8 +330,7 @@ export default function StudioPage() {
           durationSec,
         }),
       });
-      const saved = await saveRes.json();
-      if (!saveRes.ok) throw new Error(saved.error || "Save failed");
+      const saved = await jsonOrThrow(saveRes, "Create track");
 
       setStatusMsg("✅ Saved to Library!");
       router.push(`/tracks/${saved.track.id}`);

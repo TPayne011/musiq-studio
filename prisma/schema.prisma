@@ -1,39 +1,37 @@
 // prisma/schema.prisma
 
-// --- Configure DB + Client ---
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
+// --- MODELS ---
 
-// --- Models ---
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
-  image     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tracks Track[]
+  tracks    Track[]
 }
 
 model Track {
   id           String   @id @default(cuid())
   title        String
   description  String?
-  audioUrl     String
+  publicUrl    String
   storagePath  String
-  artworkUrl   String?
   durationSec  Int?
-  waveformJson Json?
   createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
+  // Relationship
+  userId  String
+  user    User  @relation(fields: [userId], references: [id])
 }

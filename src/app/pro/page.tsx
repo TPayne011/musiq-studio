@@ -248,6 +248,20 @@ export default function ProPage() {
     const name = (fallbackName || "track").replace(/[^\w.\-]+/g, "_");
     return new File([blob], name, { type: blob.type || "audio/mpeg" });
   }
+  async function jsonOrThrow(res: Response, label: string) {
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      const data = await res.json();
+      if (!res.ok)
+        throw new Error(data?.error || `${label} failed (${res.status})`);
+      return data;
+    } else {
+      const text = await res.text();
+      throw new Error(
+        `${label} non-JSON (${res.status}): ${text.slice(0, 200)}`
+      );
+    }
+  }
 
   function toFileFromBlobUrl(blobUrl: string, fallbackName: string) {
     return fetch(blobUrl)
@@ -308,28 +322,78 @@ export default function ProPage() {
       (isDeck1 ? title1 : title2) || (isDeck1 ? "Deck A" : "Deck B");
 
     try {
-      if (!url) return setMsg("Pick or load a track first.");
+      if (!url) {
+        setMsg("Pick or load a track first.");
+        return;
+      }
       setSaving(true);
       setProg(0);
       setMsg("");
 
+      // Build File from the current URL/blob
       let file: File;
-      if (url.startsWith("blob:")) file = await toFileFromBlobUrl(url, title);
-      else file = await toFileFromUrl(url, title);
+      if (url.startsWith("blob:")) {
+        const b = await (await fetch(url)).blob();
+        file = new File([b], `${title}.mp3`.replace(/[^\w.\-]+/g, "_"), {
+          type: b.type || "audio/mpeg",
+        });
+      } else {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+        const b = await res.blob();
+        file = new File([b], `${title}.mp3`.replace(/[^\w.\-]+/g, "_"), {
+          type: b.type || "audio/mpeg",
+        });
+      }
 
+      // 1) Sign upload
       const signRes = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName: file.name, bucket: "media" }),
+        body: JSON.stringify({ fileName: file.name, bucket: "media" }), // <- using 'media'
       });
-      const sign = await signRes.json();
-      if (!signRes.ok) throw new Error(sign.error || "Sign failed");
+      const sign = await jsonOrThrow(signRes, "Upload signer");
 
-      await putWithProgress(sign.signedUrl, file, sign.token, setProg);
+      // 2) PUT with progress
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable)
+            setProg(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload = () =>
+          xhr.status >= 200 && xhr.status < 300
+            ? resolve()
+            : reject(new Error(`Upload ${xhr.status}`));
+        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.open("PUT", sign.signedUrl);
+        xhr.setRequestHeader("authorization", `Bearer ${sign.token}`);
+        xhr.setRequestHeader("x-upsert", "false");
+        xhr.send(file);
+      });
 
-      const durationSec = await getAudioDuration(file).catch(() => null);
+      // 3) Duration (best-effort)
+      const durationSec = await (async () => {
+        try {
+          const tmp = document.createElement("audio");
+          tmp.preload = "metadata";
+          return await new Promise<number>((res, rej) => {
+            tmp.onloadedmetadata = () => {
+              const d = Math.round(tmp.duration);
+              URL.revokeObjectURL(tmp.src);
+              res(d);
+            };
+            tmp.onerror = rej;
+            tmp.src = URL.createObjectURL(file);
+          });
+        } catch {
+          return null;
+        }
+      })();
+
       const userId = "demo-user-id";
 
+      // 4) Create Track row
       const saveRes = await fetch("/api/tracks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -342,8 +406,7 @@ export default function ProPage() {
           durationSec,
         }),
       });
-      const saved = await saveRes.json();
-      if (!saveRes.ok) throw new Error(saved.error || "Save failed");
+      const saved = await jsonOrThrow(saveRes, "Create track");
 
       setMsg("✅ Saved!");
       router.push(`/tracks/${saved.track.id}`);

@@ -5,16 +5,17 @@
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
+    "netlify:build": "corepack enable && pnpm install --frozen-lockfile && pnpm prisma generate && pnpm build",
     "start": "next start -p 3001",
     "lint": "next lint",
     "clean": "rimraf .next && rimraf node_modules/.cache",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev --name init",
-    "netlify:build": "corepack enable && pnpm install --frozen-lockfile && pnpm prisma generate && pnpm build"
+    "prisma:migrate": "prisma migrate dev --name init"
   },
   "dependencies": {
     "@prisma/client": "^6.17.1",
     "@supabase/supabase-js": "^2.75.0",
+    "canvas": "^3.2.0",
     "framer-motion": "^12.23.22",
     "next": "15.5.3",
     "react": "19.1.0",
