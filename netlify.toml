@@ -1,0 +1,11 @@
+[build]
+  command = "pnpm netlify:build"
+  publish = ".next"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["@prisma/client", "prisma"]
+  included_files = [
+    ".prisma/client/**",
+    "node_modules/.prisma/**"
+  ]
